@@ -144,6 +144,16 @@ The MCP Inspector is a powerful tool for debugging and troubleshooting your MCP 
 - **View Request/Response Flow**: See the complete interaction between the AI and your MCP server
 - **Analyze Performance**: Identify slow tools that might need optimization
 
+- **Command to Start MCP Inspector**:
+```
+npx @modelcontextprotocol/inspector \
+  uv \
+  --directory path/to/server \
+  run \
+  package-name \
+  args...
+  ```
+
 ### Common Issues and Solutions
 
 1. **Authentication Errors**:

@@ -24,16 +24,17 @@ from typing import Dict, List, Optional, Any, Union
 import boto3
 from botocore.config import Config
 from dotenv import load_dotenv
-from fastmcp import FastMCP, Context, Field
+from fastmcp import FastMCP, Context
+from pydantic import Field
 from loguru import logger
 
-from awslabs.aws_fis_mcp_server.models import (
+from models import (
     ExperimentState,
     ExperimentActionsMode,
     StartExperimentRequest,
     ResourceExplorerViewRequest
 )
-from awslabs.aws_fis_mcp_server.consts import (
+from consts import (
     DEFAULT_AWS_REGION,
     DEFAULT_MAX_TIMEOUT_SECONDS,
     DEFAULT_INITIAL_POLL_INTERVAL,
@@ -425,11 +426,11 @@ class ExperimentTemplates:
     async def create_experiment_template(
             clientToken: str = Field(..., description="Client token for idempotency"), 
             description: str = Field(..., description="Description of the experiment template"),
+            role_arn: str = Field(..., description="IAM role ARN for experiment execution"),
             tags: Optional[Dict[str, str]] = Field(None, description="Optional tags to apply to the template"),
             stop_conditions: List[Dict[str, str]] = Field(None, description="Conditions that stop the experiment"),
             targets: Dict[str, Dict[str, Any]] = Field(None, description="Target resources for the experiment"),
             actions: Dict[str, Dict[str, Any]] = Field(None, description="Actions to perform during the experiment"),
-            role_arn: str = Field(..., description="IAM role ARN for experiment execution"),
             log_configuration: Optional[Dict[str, Any]] = Field(None, description="Configuration for experiment logging"),
             experiment_options: Optional[Dict[str, str]] = Field(None, description="Additional experiment options"),
             report_configuration: Optional[Dict[str, Any]] = Field(None, description="Configuration for experiment reporting")
