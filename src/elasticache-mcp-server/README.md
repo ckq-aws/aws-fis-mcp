@@ -1,8 +1,17 @@
 # AWS ElastiCache MCP Server
 
-The official MCP Server for interacting with AWS ElastiCache
+The official MCP Server for interacting with AWS ElastiCache control plane. In order to interact with your data in ElastiCache Serverless caches and self-designed clusters use the [Valkey MCP Server](https://github.com/awslabs/mcp/blob/main/src/valkey-mcp-server) or the [Memcached MCP Server](https://github.com/awslabs/mcp/blob/main/src/memcached-mcp-server).
 
 ## Available MCP Tools
+
+### Serverless Cache Operations
+- `create-serverless-cache` - Create a new ElastiCache serverless cache
+- `delete-serverless-cache` - Delete a serverless cache
+- `describe-serverless-caches` - Get information about serverless caches
+- `modify-serverless-cache` - Modify settings of a serverless cache
+- `connect-jump-host-serverless-cache` - Configure an EC2 instance as a jump host for serverless cache access
+- `create-jump-host-serverless-cache` - Create an EC2 jump host to access a serverless cache via SSH tunnel
+- `get-ssh-tunnel-command-serverless-cache` - Generate SSH tunnel command for serverless cache access
 
 ### Replication Group Operations
 - `create-replication-group` - Create an Amazon ElastiCache replication group with specified configuration
@@ -25,15 +34,6 @@ The official MCP Server for interacting with AWS ElastiCache
 - `connect-jump-host-cache-cluster` - Configure an EC2 instance as a jump host for cluster access
 - `create-jump-host-cache-cluster` - Create an EC2 jump host to access a cluster via SSH tunnel
 - `get-ssh-tunnel-command-cache-cluster` - Generate SSH tunnel command for cluster access
-
-### Serverless Cache Operations
-- `create-serverless-cache` - Create a new ElastiCache serverless cache
-- `delete-serverless-cache` - Delete a serverless cache
-- `describe-serverless-caches` - Get information about serverless caches
-- `modify-serverless-cache` - Modify settings of a serverless cache
-- `connect-jump-host-serverless-cache` - Configure an EC2 instance as a jump host for serverless cache access
-- `create-jump-host-serverless-cache` - Create an EC2 jump host to access a serverless cache via SSH tunnel
-- `get-ssh-tunnel-command-serverless-cache` - Generate SSH tunnel command for serverless cache access
 
 ### CloudWatch Operations
 - `get-metric-statistics` - Get CloudWatch metric statistics for ElastiCache resources with customizable time periods and dimensions
