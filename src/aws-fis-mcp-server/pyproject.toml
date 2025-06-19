@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-"awslabs.aws-fis-mcp-server" = "awslabs.aws-fis-mcp-server.server:main"
+"aws-fis-mcp-server" = "awslabs.aws_fis_mcp_server.server:main"
 
 [project.urls]
 Homepage = "https://awslabs.github.io/mcp/"
