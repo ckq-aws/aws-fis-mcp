@@ -1,6 +1,6 @@
 # AWS FIS MCP Server
 
-A Model Context Protocol (MCP) server that enables Large Language Models (LLMs) to plan, create, and execute AWS Fault Injection Simulator (FIS) experiments.
+An MCP server for designing and running controlled chaos engineering experiments on your AWS resources, helping you build more resilient cloud applications.
 
 ## Description
 
@@ -51,7 +51,13 @@ AWS_SESSION_TOKEN=your_session_token  # If using temporary credentials
 3. Change directory `cd src/aws-fis-mcp-server`
 4. Run `uv sync` to install project dependencies
 
-## Installation
+## AWS Documenation MCP Server Installation
+
+To ensure AI assistants can accurately determine available FIS actions, it's essential to install the AWS Documentation MCP server alongside this server. This combination prevents hallucinations and guarantees that fault injection experiment templates contain only valid FIS actions.
+
+For detailed installation instructions, please refer to the [AWS Documentation MCP Server README](../../src/aws-documentation-mcp-server/README.md)  
+
+## AWS FIS MCP Server Installation
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=awslabs.aws_fis_mcp_server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzX2Zpc19tY3Bfc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIn0sImRpc2FibGVkIjpmYWxzZSwiYXV0b0FwcHJvdmUiOltdfQ%3D%3D)
 
@@ -65,12 +71,7 @@ In mcp.json:
   "mcpServers": {
     "aws_fis_tool": {
       "command": "uv",
-      "args": [
-        "--directory",
-        "~/mcp/aws-fis-mcp-server/src/aws_fis_mcp_server/",
-        "run",
-        "server.py"
-      ],
+      "args": ["awslabs.aws_fis_mcp_server@latest"],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
@@ -81,7 +82,9 @@ In mcp.json:
 }
 ```
 
-## Understanding MCP (Model Context Protocol)
+## Additional Information & Troubleshooting
+
+### Understanding MCP (Model Context Protocol)
 
 MCP is a protocol that enables AI models to interact with external tools and data sources. It provides three main capabilities:
 

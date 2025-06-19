@@ -68,6 +68,7 @@ try:
         region_name=AWS_REGION,
         signature_version=AWS_CONFIG_SIGNATURE_VERSION,
         retries={'max_attempts': AWS_CONFIG_MAX_ATTEMPTS, 'mode': AWS_CONFIG_RETRY_MODE},
+        user_agent_extra='AWS-FIS-MCP-Server',
     )
 
     # Initialize AWS clients
@@ -232,11 +233,23 @@ class AwsFisActions:
     @mcp.tool('start_experiment')
     async def start_experiment(
         id: str = Field(..., description='The experiment template ID to execute'),
-        tags: Optional[Dict[str, str]] = Field(None, description='Optional tags to apply to the experiment'),
-        action: Optional[str] = Field('run-all', description='The actions mode for experiment execution (run-all, skip-all, or stop-on-failure)'),
-        max_timeout_seconds: int = Field(3600, description='Maximum time in seconds to wait for experiment completion (default: 1 hour)'),
-        initial_poll_interval: int = Field(5, description='Starting poll interval in seconds for status checks'),
-        max_poll_interval: int = Field(60, description='Maximum poll interval in seconds for status checks'),
+        tags: Optional[Dict[str, str]] = Field(
+            None, description='Optional tags to apply to the experiment'
+        ),
+        action: Optional[str] = Field(
+            'run-all',
+            description='The actions mode for experiment execution (run-all, skip-all, or stop-on-failure)',
+        ),
+        max_timeout_seconds: int = Field(
+            3600,
+            description='Maximum time in seconds to wait for experiment completion (default: 1 hour)',
+        ),
+        initial_poll_interval: int = Field(
+            5, description='Starting poll interval in seconds for status checks'
+        ),
+        max_poll_interval: int = Field(
+            60, description='Maximum poll interval in seconds for status checks'
+        ),
     ) -> Dict[str, Any]:
         """Starts an AWS FIS experiment and polls its status until completion.
 
@@ -705,12 +718,14 @@ class ExperimentTemplates:
         except Exception as e:
             Context.error(f'Error creating experiment template: {str(e)}')
             raise
-            
+
     @staticmethod
     @mcp.tool(name='update_experiment_template')
     async def update_experiment_template(
         id: str = Field(..., description='ID of the experiment template to update'),
-        description: Optional[str] = Field(None, description='Updated description of the experiment template'),
+        description: Optional[str] = Field(
+            None, description='Updated description of the experiment template'
+        ),
         stop_conditions: Optional[List[Dict[str, str]]] = Field(
             None, description='Updated conditions that stop the experiment'
         ),
@@ -720,7 +735,9 @@ class ExperimentTemplates:
         actions: Optional[Dict[str, Dict[str, Any]]] = Field(
             None, description='Updated actions to perform during the experiment'
         ),
-        role_arn: Optional[str] = Field(None, description='Updated IAM role ARN for experiment execution'),
+        role_arn: Optional[str] = Field(
+            None, description='Updated IAM role ARN for experiment execution'
+        ),
         log_configuration: Optional[Dict[str, Any]] = Field(
             None, description='Updated configuration for experiment logging'
         ),
@@ -753,28 +770,28 @@ class ExperimentTemplates:
         try:
             # Build the update parameters, only including non-None values
             update_params = {'id': id}
-            
+
             if description is not None:
                 update_params['description'] = description
-                
+
             if stop_conditions is not None:
                 update_params['stopConditions'] = stop_conditions
-                
+
             if targets is not None:
                 update_params['targets'] = targets
-                
+
             if actions is not None:
                 update_params['actions'] = actions
-                
+
             if role_arn is not None:
                 update_params['roleArn'] = role_arn
-                
+
             if log_configuration is not None:
                 update_params['logConfiguration'] = log_configuration
-                
+
             if experiment_options is not None:
                 update_params['experimentOptions'] = experiment_options
-                
+
             if experiment_report_configuration is not None:
                 update_params['experimentReportConfiguration'] = experiment_report_configuration
 

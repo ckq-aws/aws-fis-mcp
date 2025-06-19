@@ -19,7 +19,6 @@ from awslabs.aws_fis_mcp_server.consts import DEFAULT_MAX_RESOURCES
 
 # Import the class to test
 from awslabs.aws_fis_mcp_server.server import ResourceDiscovery
-from botocore.exceptions import ClientError
 from unittest.mock import MagicMock, patch
 
 
@@ -193,7 +192,9 @@ class TestResourceDiscovery(unittest.TestCase):
 
     @patch('awslabs.aws_fis_mcp_server.server.resource_explorer')
     @patch('awslabs.aws_fis_mcp_server.server.Context')
-    async def test_discover_resources_resource_explorer_only(self, mock_context, mock_resource_explorer):
+    async def test_discover_resources_resource_explorer_only(
+        self, mock_context, mock_resource_explorer
+    ):
         """Test discovering resources from Resource Explorer only."""
         # Setup mock response for resource_explorer.search
         mock_resource_explorer.search.return_value = {
@@ -278,7 +279,9 @@ class TestResourceDiscovery(unittest.TestCase):
 
         # Verify the result
         self.assertIn('resources', result)
-        self.assertEqual(len(result['resources']), 2)  # 1 from CloudFormation, 1 from Resource Explorer
+        self.assertEqual(
+            len(result['resources']), 2
+        )  # 1 from CloudFormation, 1 from Resource Explorer
 
         # Check CloudFormation resource
         cfn_resource = next(r for r in result['resources'] if r['source'] == 'cloudformation')
