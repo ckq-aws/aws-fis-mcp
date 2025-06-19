@@ -55,7 +55,7 @@ AWS_SESSION_TOKEN=your_session_token  # If using temporary credentials
 
 To ensure AI assistants can accurately determine available FIS actions, it's essential to install the AWS Documentation MCP server alongside this server. This combination prevents hallucinations and guarantees that fault injection experiment templates contain only valid FIS actions.
 
-For detailed installation instructions, please refer to the [AWS Documentation MCP Server README](../../src/aws-documentation-mcp-server/README.md)  
+For detailed installation instructions, please refer to the [AWS Documentation MCP Server README](../../src/aws-documentation-mcp-server/README.md)
 
 ## AWS FIS MCP Server Installation
 
