@@ -15,11 +15,11 @@
 """Tests for the ExperimentTemplates class in the server module."""
 
 import unittest
-from unittest.mock import patch, MagicMock
-from botocore.exceptions import ClientError
 
 # Import the class to test
 from awslabs.aws_fis_mcp_server.server import ExperimentTemplates
+from botocore.exceptions import ClientError
+from unittest.mock import MagicMock, patch
 
 
 class TestExperimentTemplates(unittest.TestCase):
@@ -37,7 +37,7 @@ class TestExperimentTemplates(unittest.TestCase):
                 'arn': f'arn:aws:fis:us-east-1:123456789012:experiment-template/{template_id}',
                 'description': 'Test Template',
                 'creationTime': '2023-01-01T00:00:00.000Z',
-                'lastUpdateTime': '2023-01-01T00:00:00.000Z'
+                'lastUpdateTime': '2023-01-01T00:00:00.000Z',
             }
         }
 
@@ -45,14 +45,14 @@ class TestExperimentTemplates(unittest.TestCase):
         result = await ExperimentTemplates.create_experiment_template(
             clientToken='test-token',
             description='Test Template',
-            role_arn='arn:aws:iam::123456789012:role/FisRole'
+            role_arn='arn:aws:iam::123456789012:role/FisRole',
         )
 
         # Verify the result
         self.assertIn('experimentTemplate', result)
         self.assertEqual(result['experimentTemplate']['id'], template_id)
         self.assertEqual(result['experimentTemplate']['description'], 'Test Template')
-        
+
         # Verify the AWS client was called correctly
         mock_aws_fis.create_experiment_template.assert_called_once_with(
             clientToken='test-token',
@@ -64,7 +64,7 @@ class TestExperimentTemplates(unittest.TestCase):
             tags={},
             logConfiguration=None,
             experimentOptions=None,
-            experimentReportConfiguration=None
+            experimentReportConfiguration=None,
         )
 
     @patch('awslabs.aws_fis_mcp_server.server.aws_fis')
@@ -79,7 +79,7 @@ class TestExperimentTemplates(unittest.TestCase):
                 'arn': f'arn:aws:fis:us-east-1:123456789012:experiment-template/{template_id}',
                 'description': 'Test Template',
                 'creationTime': '2023-01-01T00:00:00.000Z',
-                'lastUpdateTime': '2023-01-01T00:00:00.000Z'
+                'lastUpdateTime': '2023-01-01T00:00:00.000Z',
             }
         }
 
@@ -87,17 +87,17 @@ class TestExperimentTemplates(unittest.TestCase):
         client_token = 'test-token'
         description = 'Test Template'
         tags = {'Name': 'Test Template'}
-        stop_conditions = [{'source': 'aws:cloudwatch:alarm', 'value': 'arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm'}]
-        targets = {
-            'Instances': {
-                'resource_type': 'aws:ec2:instance',
-                'selection_mode': 'ALL'
+        stop_conditions = [
+            {
+                'source': 'aws:cloudwatch:alarm',
+                'value': 'arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm',
             }
-        }
+        ]
+        targets = {'Instances': {'resource_type': 'aws:ec2:instance', 'selection_mode': 'ALL'}}
         actions = {
             'StopInstances': {
                 'action_id': 'aws:ec2:stop-instances',
-                'targets': {'Instances': 'Instances'}
+                'targets': {'Instances': 'Instances'},
             }
         }
         role_arn = 'arn:aws:iam::123456789012:role/FisRole'
@@ -116,13 +116,13 @@ class TestExperimentTemplates(unittest.TestCase):
             role_arn=role_arn,
             log_configuration=log_configuration,
             experiment_options=experiment_options,
-            report_configuration=report_configuration
+            report_configuration=report_configuration,
         )
 
         # Verify the result
         self.assertIn('experimentTemplate', result)
         self.assertEqual(result['experimentTemplate']['id'], template_id)
-        
+
         # Verify the AWS client was called correctly
         mock_aws_fis.create_experiment_template.assert_called_once_with(
             clientToken=client_token,
@@ -134,7 +134,7 @@ class TestExperimentTemplates(unittest.TestCase):
             roleArn=role_arn,
             logConfiguration=log_configuration,
             experimentOptions=experiment_options,
-            experimentReportConfiguration=report_configuration
+            experimentReportConfiguration=report_configuration,
         )
 
     @patch('awslabs.aws_fis_mcp_server.server.aws_fis')
@@ -144,21 +144,19 @@ class TestExperimentTemplates(unittest.TestCase):
         # Setup mock to raise an exception
         mock_aws_fis.create_experiment_template.side_effect = ClientError(
             {'Error': {'Code': 'ValidationException', 'Message': 'Invalid role ARN'}},
-            'create_experiment_template'
+            'create_experiment_template',
         )
         mock_context.error = MagicMock()
 
         # Call the method and expect an exception
         with self.assertRaises(Exception):
             await ExperimentTemplates.create_experiment_template(
-                clientToken='test-token',
-                description='Test Template',
-                role_arn='invalid-role-arn'
+                clientToken='test-token', description='Test Template', role_arn='invalid-role-arn'
             )
-        
+
         # Verify error was logged
         mock_context.error.assert_called_once()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

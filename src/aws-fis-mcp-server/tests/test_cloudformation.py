@@ -15,11 +15,11 @@
 """Tests for the CloudFormation class in the server module."""
 
 import unittest
-from unittest.mock import patch, MagicMock
-from botocore.exceptions import ClientError
 
 # Import the class to test
 from awslabs.aws_fis_mcp_server.server import CloudFormation
+from botocore.exceptions import ClientError
+from unittest.mock import MagicMock, patch
 
 
 class TestCloudFormation(unittest.TestCase):
@@ -37,7 +37,7 @@ class TestCloudFormation(unittest.TestCase):
                     'StackName': 'test-stack',
                     'TemplateDescription': 'Test stack',
                     'CreationTime': '2023-01-01T00:00:00.000Z',
-                    'StackStatus': 'CREATE_COMPLETE'
+                    'StackStatus': 'CREATE_COMPLETE',
                 }
             ]
         }
@@ -50,7 +50,7 @@ class TestCloudFormation(unittest.TestCase):
         self.assertEqual(len(result['stacks']), 1)
         self.assertEqual(result['stacks'][0]['StackName'], 'test-stack')
         self.assertEqual(result['stacks'][0]['StackStatus'], 'CREATE_COMPLETE')
-        
+
         # Verify the AWS client was called correctly
         mock_cloudformation.list_stacks.assert_called_once()
 
@@ -67,10 +67,10 @@ class TestCloudFormation(unittest.TestCase):
                         'StackName': 'test-stack-1',
                         'TemplateDescription': 'Test stack 1',
                         'CreationTime': '2023-01-01T00:00:00.000Z',
-                        'StackStatus': 'CREATE_COMPLETE'
+                        'StackStatus': 'CREATE_COMPLETE',
                     }
                 ],
-                'NextToken': 'token1'
+                'NextToken': 'token1',
             },
             {
                 'StackSummaries': [
@@ -79,10 +79,10 @@ class TestCloudFormation(unittest.TestCase):
                         'StackName': 'test-stack-2',
                         'TemplateDescription': 'Test stack 2',
                         'CreationTime': '2023-01-02T00:00:00.000Z',
-                        'StackStatus': 'CREATE_COMPLETE'
+                        'StackStatus': 'CREATE_COMPLETE',
                     }
                 ]
-            }
+            },
         ]
 
         # Call the method
@@ -93,7 +93,7 @@ class TestCloudFormation(unittest.TestCase):
         self.assertEqual(len(result['stacks']), 2)
         self.assertEqual(result['stacks'][0]['StackName'], 'test-stack-1')
         self.assertEqual(result['stacks'][1]['StackName'], 'test-stack-2')
-        
+
         # Verify the AWS client was called correctly
         self.assertEqual(mock_cloudformation.list_stacks.call_count, 2)
         mock_cloudformation.list_stacks.assert_any_call()
@@ -105,15 +105,14 @@ class TestCloudFormation(unittest.TestCase):
         """Test error handling when listing CloudFormation stacks."""
         # Setup mock to raise an exception
         mock_cloudformation.list_stacks.side_effect = ClientError(
-            {'Error': {'Code': 'InternalServerError', 'Message': 'Test error'}},
-            'list_stacks'
+            {'Error': {'Code': 'InternalServerError', 'Message': 'Test error'}}, 'list_stacks'
         )
         mock_context.error = MagicMock()
 
         # Call the method and expect an exception
         with self.assertRaises(Exception):
             await CloudFormation.list_cfn_stacks()
-        
+
         # Verify error was logged
         mock_context.error.assert_called_once()
 
@@ -130,7 +129,7 @@ class TestCloudFormation(unittest.TestCase):
                     'PhysicalResourceId': 'i-12345678901234567',
                     'ResourceType': 'AWS::EC2::Instance',
                     'ResourceStatus': 'CREATE_COMPLETE',
-                    'LastUpdatedTimestamp': '2023-01-01T00:00:00.000Z'
+                    'LastUpdatedTimestamp': '2023-01-01T00:00:00.000Z',
                 }
             ]
         }
@@ -143,7 +142,7 @@ class TestCloudFormation(unittest.TestCase):
         self.assertEqual(len(result['resources']), 1)
         self.assertEqual(result['resources'][0]['LogicalResourceId'], 'TestInstance')
         self.assertEqual(result['resources'][0]['ResourceType'], 'AWS::EC2::Instance')
-        
+
         # Verify the AWS client was called correctly
         mock_cloudformation.list_stack_resources.assert_called_once_with(StackName=stack_name)
 
@@ -161,10 +160,10 @@ class TestCloudFormation(unittest.TestCase):
                         'PhysicalResourceId': 'i-12345678901234567',
                         'ResourceType': 'AWS::EC2::Instance',
                         'ResourceStatus': 'CREATE_COMPLETE',
-                        'LastUpdatedTimestamp': '2023-01-01T00:00:00.000Z'
+                        'LastUpdatedTimestamp': '2023-01-01T00:00:00.000Z',
                     }
                 ],
-                'NextToken': 'token1'
+                'NextToken': 'token1',
             },
             {
                 'StackResourceSummaries': [
@@ -173,10 +172,10 @@ class TestCloudFormation(unittest.TestCase):
                         'PhysicalResourceId': 'i-76543210987654321',
                         'ResourceType': 'AWS::EC2::Instance',
                         'ResourceStatus': 'CREATE_COMPLETE',
-                        'LastUpdatedTimestamp': '2023-01-02T00:00:00.000Z'
+                        'LastUpdatedTimestamp': '2023-01-02T00:00:00.000Z',
                     }
                 ]
-            }
+            },
         ]
 
         # Call the method
@@ -187,11 +186,13 @@ class TestCloudFormation(unittest.TestCase):
         self.assertEqual(len(result['resources']), 2)
         self.assertEqual(result['resources'][0]['LogicalResourceId'], 'TestInstance1')
         self.assertEqual(result['resources'][1]['LogicalResourceId'], 'TestInstance2')
-        
+
         # Verify the AWS client was called correctly
         self.assertEqual(mock_cloudformation.list_stack_resources.call_count, 2)
         mock_cloudformation.list_stack_resources.assert_any_call(StackName=stack_name)
-        mock_cloudformation.list_stack_resources.assert_any_call(StackName=stack_name, NextToken='token1')
+        mock_cloudformation.list_stack_resources.assert_any_call(
+            StackName=stack_name, NextToken='token1'
+        )
 
     @patch('awslabs.aws_fis_mcp_server.server.cloudformation')
     @patch('awslabs.aws_fis_mcp_server.server.Context')
@@ -201,17 +202,17 @@ class TestCloudFormation(unittest.TestCase):
         stack_name = 'test-stack'
         mock_cloudformation.list_stack_resources.side_effect = ClientError(
             {'Error': {'Code': 'ValidationError', 'Message': 'Stack does not exist'}},
-            'list_stack_resources'
+            'list_stack_resources',
         )
         mock_context.error = MagicMock()
 
         # Call the method and expect an exception
         with self.assertRaises(Exception):
             await CloudFormation.get_stack_resources(stack_name=stack_name)
-        
+
         # Verify error was logged
         mock_context.error.assert_called_once()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

@@ -15,13 +15,12 @@
 """Tests for the ResourceExplorer class in the server module."""
 
 import unittest
-from unittest.mock import patch, MagicMock
-import time
-from botocore.exceptions import ClientError
+from awslabs.aws_fis_mcp_server.consts import DEFAULT_MAX_RESOURCES
 
 # Import the class to test
 from awslabs.aws_fis_mcp_server.server import ResourceExplorer
-from awslabs.aws_fis_mcp_server.consts import DEFAULT_MAX_RESOURCES
+from botocore.exceptions import ClientError
+from unittest.mock import MagicMock, patch
 
 
 class TestResourceExplorer(unittest.TestCase):
@@ -38,7 +37,7 @@ class TestResourceExplorer(unittest.TestCase):
                     'Service': 'ec2',
                     'Region': 'us-east-1',
                     'ResourceType': 'instance',
-                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567'
+                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567',
                 }
             ]
         }
@@ -51,9 +50,11 @@ class TestResourceExplorer(unittest.TestCase):
         self.assertEqual(len(result['resources']), 1)
         self.assertEqual(result['resources'][0]['service'], 'ec2')
         self.assertEqual(result['resources'][0]['resource_type'], 'instance')
-        
+
         # Verify the AWS client was called correctly
-        mock_resource_explorer.list_resources.assert_called_once_with(MaxResults=DEFAULT_MAX_RESOURCES)
+        mock_resource_explorer.list_resources.assert_called_once_with(
+            MaxResults=DEFAULT_MAX_RESOURCES
+        )
 
     @patch('awslabs.aws_fis_mcp_server.server.resource_explorer')
     @patch('awslabs.aws_fis_mcp_server.server.Context')
@@ -67,10 +68,10 @@ class TestResourceExplorer(unittest.TestCase):
                         'Service': 'ec2',
                         'Region': 'us-east-1',
                         'ResourceType': 'instance',
-                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567'
+                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567',
                     }
                 ],
-                'NextToken': 'token1'
+                'NextToken': 'token1',
             },
             {
                 'Resources': [
@@ -78,10 +79,10 @@ class TestResourceExplorer(unittest.TestCase):
                         'Service': 's3',
                         'Region': 'us-east-1',
                         'ResourceType': 'bucket',
-                        'Arn': 'arn:aws:s3:::test-bucket'
+                        'Arn': 'arn:aws:s3:::test-bucket',
                     }
                 ]
-            }
+            },
         ]
 
         # Call the method
@@ -92,13 +93,12 @@ class TestResourceExplorer(unittest.TestCase):
         self.assertEqual(len(result['resources']), 2)
         self.assertEqual(result['resources'][0]['service'], 'ec2')
         self.assertEqual(result['resources'][1]['service'], 's3')
-        
+
         # Verify the AWS client was called correctly
         self.assertEqual(mock_resource_explorer.list_resources.call_count, 2)
         mock_resource_explorer.list_resources.assert_any_call(MaxResults=DEFAULT_MAX_RESOURCES)
         mock_resource_explorer.list_resources.assert_any_call(
-            MaxResults=DEFAULT_MAX_RESOURCES,
-            NextToken='token1'
+            MaxResults=DEFAULT_MAX_RESOURCES, NextToken='token1'
         )
 
     @patch('awslabs.aws_fis_mcp_server.server.resource_explorer')
@@ -112,7 +112,7 @@ class TestResourceExplorer(unittest.TestCase):
                     'Service': 'ec2',
                     'Region': 'us-east-1',
                     'ResourceType': 'instance',
-                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567'
+                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567',
                 }
             ]
         }
@@ -123,7 +123,7 @@ class TestResourceExplorer(unittest.TestCase):
 
         # Verify the result
         self.assertIn('resources', result)
-        
+
         # Verify the AWS client was called correctly with the custom limit
         mock_resource_explorer.list_resources.assert_called_once_with(MaxResults=custom_limit)
 
@@ -133,15 +133,14 @@ class TestResourceExplorer(unittest.TestCase):
         """Test error handling when listing resources."""
         # Setup mock to raise an exception
         mock_resource_explorer.list_resources.side_effect = ClientError(
-            {'Error': {'Code': 'InternalServerError', 'Message': 'Test error'}},
-            'list_resources'
+            {'Error': {'Code': 'InternalServerError', 'Message': 'Test error'}}, 'list_resources'
         )
         mock_context.error = MagicMock()
 
         # Call the method and expect an exception
         with self.assertRaises(Exception):
             await ResourceExplorer.list_resources()
-        
+
         # Verify error was logged
         mock_context.error.assert_called_once()
 
@@ -157,7 +156,7 @@ class TestResourceExplorer(unittest.TestCase):
                     'ViewName': 'test-view',
                     'Filters': {'FilterString': 'service:ec2'},
                     'IncludedProperties': ['tags'],
-                    'LastUpdatedAt': '2023-01-01T00:00:00.000Z'
+                    'LastUpdatedAt': '2023-01-01T00:00:00.000Z',
                 }
             ]
         }
@@ -168,7 +167,7 @@ class TestResourceExplorer(unittest.TestCase):
         # Verify the result
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['ViewName'], 'test-view')
-        
+
         # Verify the AWS client was called correctly
         mock_resource_explorer.list_views.assert_called_once()
 
@@ -185,10 +184,10 @@ class TestResourceExplorer(unittest.TestCase):
                         'ViewName': 'test-view-1',
                         'Filters': {'FilterString': 'service:ec2'},
                         'IncludedProperties': ['tags'],
-                        'LastUpdatedAt': '2023-01-01T00:00:00.000Z'
+                        'LastUpdatedAt': '2023-01-01T00:00:00.000Z',
                     }
                 ],
-                'NextToken': 'token1'
+                'NextToken': 'token1',
             },
             {
                 'Views': [
@@ -197,10 +196,10 @@ class TestResourceExplorer(unittest.TestCase):
                         'ViewName': 'test-view-2',
                         'Filters': {'FilterString': 'service:s3'},
                         'IncludedProperties': ['tags'],
-                        'LastUpdatedAt': '2023-01-02T00:00:00.000Z'
+                        'LastUpdatedAt': '2023-01-02T00:00:00.000Z',
                     }
                 ]
-            }
+            },
         ]
 
         # Call the method
@@ -210,7 +209,7 @@ class TestResourceExplorer(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]['ViewName'], 'test-view-1')
         self.assertEqual(result[1]['ViewName'], 'test-view-2')
-        
+
         # Verify the AWS client was called correctly
         self.assertEqual(mock_resource_explorer.list_views.call_count, 2)
         mock_resource_explorer.list_views.assert_any_call()
@@ -222,15 +221,14 @@ class TestResourceExplorer(unittest.TestCase):
         """Test error handling when listing views."""
         # Setup mock to raise an exception
         mock_resource_explorer.list_views.side_effect = ClientError(
-            {'Error': {'Code': 'InternalServerError', 'Message': 'Test error'}},
-            'list_views'
+            {'Error': {'Code': 'InternalServerError', 'Message': 'Test error'}}, 'list_views'
         )
         mock_context.error = MagicMock()
 
         # Call the method and expect an exception
         with self.assertRaises(Exception):
             await ResourceExplorer.list_views()
-        
+
         # Verify error was logged
         mock_context.error.assert_called_once()
 
@@ -246,31 +244,28 @@ class TestResourceExplorer(unittest.TestCase):
                 'ViewName': 'test-view',
                 'Filters': {'FilterString': 'service:ec2'},
                 'IncludedProperties': ['tags'],
-                'LastUpdatedAt': '2023-01-01T00:00:00.000Z'
+                'LastUpdatedAt': '2023-01-01T00:00:00.000Z',
             }
         }
-        
+
         # Mock time.time() to return a fixed value
         mock_time.return_value = 1672531200  # 2023-01-01T00:00:00.000Z
 
         # Call the method with minimal parameters
-        result = await ResourceExplorer.create_view(
-            query='service:ec2',
-            view_name='test-view'
-        )
+        result = await ResourceExplorer.create_view(query='service:ec2', view_name='test-view')
 
         # Verify the result
         self.assertIn('View', result)
         self.assertEqual(result['View']['ViewName'], 'test-view')
         self.assertEqual(result['View']['Filters']['FilterString'], 'service:ec2')
-        
+
         # Verify the AWS client was called correctly
         mock_resource_explorer.create_view.assert_called_once_with(
             ClientToken='create-view-1672531200',
             Filters={'FilterString': 'service:ec2'},
             Scope=None,
             Tags={},
-            ViewName='test-view'
+            ViewName='test-view',
         )
 
     @patch('awslabs.aws_fis_mcp_server.server.resource_explorer')
@@ -284,7 +279,7 @@ class TestResourceExplorer(unittest.TestCase):
                 'ViewName': 'test-view',
                 'Filters': {'FilterString': 'service:ec2'},
                 'IncludedProperties': ['tags'],
-                'LastUpdatedAt': '2023-01-01T00:00:00.000Z'
+                'LastUpdatedAt': '2023-01-01T00:00:00.000Z',
             }
         }
 
@@ -297,24 +292,20 @@ class TestResourceExplorer(unittest.TestCase):
 
         # Call the method with all parameters
         result = await ResourceExplorer.create_view(
-            query=query,
-            view_name=view_name,
-            tags=tags,
-            scope=scope,
-            client_token=client_token
+            query=query, view_name=view_name, tags=tags, scope=scope, client_token=client_token
         )
 
         # Verify the result
         self.assertIn('View', result)
         self.assertEqual(result['View']['ViewName'], view_name)
-        
+
         # Verify the AWS client was called correctly
         mock_resource_explorer.create_view.assert_called_once_with(
             ClientToken=client_token,
             Filters={'FilterString': query},
             Scope=scope,
             Tags=tags,
-            ViewName=view_name
+            ViewName=view_name,
         )
 
     @patch('awslabs.aws_fis_mcp_server.server.resource_explorer')
@@ -324,20 +315,17 @@ class TestResourceExplorer(unittest.TestCase):
         # Setup mock to raise an exception
         mock_resource_explorer.create_view.side_effect = ClientError(
             {'Error': {'Code': 'ValidationException', 'Message': 'Invalid query syntax'}},
-            'create_view'
+            'create_view',
         )
         mock_context.error = MagicMock()
 
         # Call the method and expect an exception
         with self.assertRaises(Exception):
-            await ResourceExplorer.create_view(
-                query='invalid:query:syntax',
-                view_name='test-view'
-            )
-        
+            await ResourceExplorer.create_view(query='invalid:query:syntax', view_name='test-view')
+
         # Verify error was logged
         mock_context.error.assert_called_once()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

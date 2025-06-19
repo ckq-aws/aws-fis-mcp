@@ -4,60 +4,9 @@ A Model Context Protocol (MCP) server that enables Large Language Models (LLMs) 
 
 ## Description
 
-This project provides a Model Context Protocol (MCP) server that enables LLMs to interact with AWS Fault Injection Simulator (FIS). It allows AI assistants to plan, create, and execute fault injection experiments in AWS environments.
+This MCP server bridges the gap between AI assistants and AWS Fault Injection Simulator (FIS), enabling controlled chaos engineering experiments through natural language interactions. The server implements the Model Context Protocol to expose FIS capabilities as tools that Large Language Models can understand and utilize.
 
-## Features
-
-- **FIS Experiment Management**
-  - List all FIS experiments
-  - Get detailed experiment information
-  - Start and monitor experiments
-  - Create experiment templates
-
-- **CloudFormation Integration**
-  - List CloudFormation stacks
-  - Get stack resources
-
-- **Resource Explorer**
-  - List AWS resources
-  - Create and manage resource views
-
-## Requirements
-
-- Python 3.10+
-- AWS credentials with appropriate permissions
-- Required Python packages (see Installation)
-
-## Installation
-
-1. Clone this repository
-2. Create a virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -e .
-   ```
-
-## Configuration
-
-Create a `.env` file in the project root with the following AWS credentials:
-
-```
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_SESSION_TOKEN=your_session_token  # If using temporary credentials
-```
-
-## Usage
-
-Run the MCP server:
-
-```bash
-python main.py
-```
+With this integration, AI assistants can help users design resilience testing scenarios, identify appropriate AWS resources for fault injection, create experiment templates with precise parameters, execute controlled failures, and analyze the results—all while maintaining safety guardrails and following AWS best practices for chaos engineering.
 
 The server provides the following MCP tools:
 
@@ -68,14 +17,69 @@ The server provides the following MCP tools:
 - `get_experiment_template`: Gets details about a specific template
 - `start_experiment`: Starts an experiment and monitors its status
 
-### CloudFormation Tools
-- `list_cfn_stacks`: Lists all CloudFormation stacks
-- `get_stack_resources`: Gets resources from a specific stack
+### AWS Resource Discovery Tools
+   ### CloudFormation Tools
+   - `list_cfn_stacks`: Lists all CloudFormation stacks
+   - `get_stack_resources`: Gets resources from a specific stack
 
-### Resource Explorer Tools
-- `list_resources`: Lists AWS resources
-- `list_views`: Lists resource explorer views
-- `create_view`: Creates a new resource view
+   ### AWS Resource Explorer Tools
+   - `list_resources`: Lists AWS resources
+   - `list_views`: Lists resource explorer views
+   - `create_view`: Creates a new resource view
+
+## Requirements
+
+- Python 3.10+
+- AWS credentials with appropriate IAM permissions
+- Required Python packages (see Installation)
+
+### Pre-requisites
+
+## AWS Credentials
+
+Create a `.env` file in the project root with the following AWS credentials:
+
+```
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_SESSION_TOKEN=your_session_token  # If using temporary credentials
+```
+
+## Setting up the environment
+1. Install uv from [Astral](https://docs.astral.sh/uv/getting-started/installation/) or the [GitHub README](https://github.com/astral-sh/uv#installation)
+2. Install Python 3.10 or newer using `uv python install 3.10` (or a more recent version)
+3. Change directory `cd src/aws-fis-mcp-server`
+4. Run `uv sync` to install project dependencies
+
+## Installation
+
+[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/install-mcp?name=awslabs.aws_fis_mcp_server&config=eyJjb21tYW5kIjoidXZ4IGF3c2xhYnMuYXdzX2Zpc19tY3Bfc2VydmVyQGxhdGVzdCIsImVudiI6eyJGQVNUTUNQX0xPR19MRVZFTCI6IkVSUk9SIn0sImRpc2FibGVkIjpmYWxzZSwiYXV0b0FwcHJvdmUiOltdfQ%3D%3D)
+
+Configure the MCP server in your MCP client configuration (e.g., for Amazon Q Developer CLI, edit ~/.aws/amazonq/mcp.json)" --> as shown here: https://github.com/awslabs/mcp/tree/main/src/amazon-kendra-index-mcp-server#installation
+
+Start the AWS FIS MCP server by configuring your mcp.json file as follows:
+
+In mcp.json:
+```json
+{
+  "mcpServers": {
+    "aws_fis_tool": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "~/mcp/aws-fis-mcp-server/src/aws_fis_mcp_server/",
+        "run",
+        "server.py"
+      ],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
 
 ## Understanding MCP (Model Context Protocol)
 
@@ -117,33 +121,13 @@ Resources provide the AI with the information it needs to make informed decision
 
 ## Troubleshooting with MCP Inspector
 
-The MCP Inspector is a powerful tool for debugging and troubleshooting your MCP server. It allows you to:
+The MCP Inspector is a powerful tool for debugging and troubleshooting your MCP server. It runs locally and acts as a client-side portal to test your MCP server and its functions in real-time without needing to integrate with an actual LLM.
 
-### Setting Up MCP Inspector
+### Installing MCP Inspector
 
-1. Install the MCP Inspector:
-   ```bash
-   pip install mcp-inspector
-   ```
-
-2. Run your MCP server in one terminal:
-   ```bash
-   python main.py
-   ```
-
-3. In another terminal, start the MCP Inspector:
-   ```bash
-   mcp-inspector
-   ```
-
-### Using MCP Inspector
-
-- **Inspect Tool Calls**: View all tool calls made by the AI, including parameters and return values
-- **Debug Errors**: Identify where errors occur in your tool implementations
-- **Test Tools Manually**: Execute tools directly to verify they work as expected
-- **View Request/Response Flow**: See the complete interaction between the AI and your MCP server
-- **Analyze Performance**: Identify slow tools that might need optimization
-
+1. Install Node.js if you haven't already: https://nodejs.org/en/download
+2. This will automatially install npx which is needed to run the mcp inspector. The inspector runs directly through npx without requiring installation.
+3. Run MCP Inspector:
 - **Command to Start MCP Inspector**:
 ```
 npx @modelcontextprotocol/inspector \
@@ -153,6 +137,17 @@ npx @modelcontextprotocol/inspector \
   package-name \
   args...
   ```
+4. In your terminal copy or click the link to the inspector with the pre-filled token: http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=[PRE-FILLED TOKEN]
+5. Happy debugging!
+
+### Using MCP Inspector
+
+- **Interactive Testing**: Test your MCP server tools directly through a user-friendly interface without needing an LLM
+- **Inspect Tool Calls**: View all tool calls, including parameters and return values in real-time
+- **Debug Errors**: Identify where errors occur in your tool implementations with detailed error reporting
+- **Test Tools Manually**: Execute tools directly with custom parameters to verify they work as expected
+- **View Request/Response Flow**: See the complete interaction between the client and your MCP server
+- **Analyze Performance**: Identify slow tools that might need optimization with timing metrics
 
 ### Common Issues and Solutions
 
