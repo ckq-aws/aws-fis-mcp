@@ -33,3 +33,23 @@ version_files = [
     "awslabs/aws-fis-mcp-server/__init__.py:__version__"
 ]
 update_changelog_on_bump = true
+
+[tool.pytest.ini_options]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+testpaths = [ "tests"]
+asyncio_mode = "auto"
+markers = [
+    "live: marks tests that make live API calls (deselect with '-m \"not live\"')",
+    "asyncio: marks tests that use asyncio"
+]
+
+[tool.coverage.report]
+exclude_also = [
+    'pragma: no cover',
+    'if __name__ == .__main__.:\n    main()',
+]
+
+[tool.coverage.run]
+source = ["awslabs"]
