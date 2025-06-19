@@ -24,6 +24,25 @@ dependencies = [
 [project.scripts]
 "awslabs.aws-fis-mcp-server" = "awslabs.aws-fis-mcp-server.server:main"
 
+[project.urls]
+Homepage = "https://awslabs.github.io/mcp/"
+Documentation = "https://awslabs.github.io/mcp/servers/aws-documentation-mcp-server/"
+Source = "https://github.com/awslabs/mcp.git"
+"Bug Tracker" = "https://github.com/awslabs/mcp/issues"
+Changelog = "https://github.com/awslabs/mcp/blob/main/src/aws-documentation-mcp-server/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.2.2",
+    "pre-commit>=4.1.0",
+    "ruff>=0.9.7",
+    "pyright>=1.1.398",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.1",
+    "pytest-asyncio>=0.26.0",
+]
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 version = "0.1.0"

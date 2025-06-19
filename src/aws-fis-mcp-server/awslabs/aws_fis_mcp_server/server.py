@@ -19,8 +19,7 @@ import boto3
 import os
 import sys
 import time
-from botocore.config import Config
-from consts import (
+from awslabs.aws_fis_mcp_server.consts import (
     AWS_CONFIG_MAX_ATTEMPTS,
     AWS_CONFIG_RETRY_MODE,
     AWS_CONFIG_SIGNATURE_VERSION,
@@ -31,12 +30,12 @@ from consts import (
     ENV_AWS_SECRET_ACCESS_KEY,
     ENV_AWS_SESSION_TOKEN,
     ENV_FASTMCP_LOG_LEVEL,
-    SERVICE_BEDROCK,
     SERVICE_CLOUDFORMATION,
     SERVICE_FIS,
     SERVICE_RESOURCE_EXPLORER,
     SERVICE_S3,
 )
+from botocore.config import Config
 from dotenv import load_dotenv
 from fastmcp import Context, FastMCP
 from loguru import logger
@@ -73,7 +72,7 @@ try:
 
     # Initialize AWS clients
     aws_fis = session.client(SERVICE_FIS, config=aws_config)
-    bedrock = session.client(SERVICE_BEDROCK, config=aws_config)
+    # Removed Bedrock client as it's no longer needed
     s3 = session.client(SERVICE_S3, config=aws_config)
     resource_explorer = session.client(SERVICE_RESOURCE_EXPLORER, config=aws_config)
     cloudformation = session.client(SERVICE_CLOUDFORMATION, config=aws_config)

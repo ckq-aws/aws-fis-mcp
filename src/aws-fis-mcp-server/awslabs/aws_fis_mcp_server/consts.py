@@ -41,7 +41,7 @@ ENV_FASTMCP_LOG_LEVEL = 'FASTMCP_LOG_LEVEL'
 
 # AWS service names
 SERVICE_FIS = 'fis'
-SERVICE_BEDROCK = 'bedrock'
+# Removed Bedrock service as it's no longer needed
 SERVICE_S3 = 's3'
 SERVICE_RESOURCE_EXPLORER = 'resource-explorer-2'
 SERVICE_CLOUDFORMATION = 'cloudformation'
