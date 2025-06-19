@@ -72,3 +72,24 @@ exclude_also = [
 
 [tool.coverage.run]
 source = ["awslabs"]
+
+[tool.pyright]
+include = ["awslabs", "tests"]
+exclude = ["**/__pycache__", "**/.venv"]
+typeCheckingMode = "basic"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownLambdaType = false
+reportUnknownParameterType = false
+reportCallIssue = false
+reportArgumentType = false
+reportAttributeAccessIssue = false
+reportFunctionMemberAccess = false
+reportPrivateUsage = false
+reportUnboundVariable = true
+reportGeneralTypeIssues = false
+pythonVersion = "3.10"
+pythonPlatform = "All"
