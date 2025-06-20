@@ -15,7 +15,7 @@
 """Test fixtures for AWS FIS MCP server tests."""
 
 # Import the server module to patch its components
-import awslabs.src.aws_fis_mcp_server.server as server_module
+import awslabs.aws_fis_mcp_server.server as server_module
 import boto3
 import pytest
 from fastmcp import Context
