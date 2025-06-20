@@ -278,6 +278,7 @@ dependencies = [
     { name = "pre-commit" },
     { name = "pydantic" },
     { name = "pypdf" },
+    { name = "pytest-cov" },
     { name = "sentence-transformers" },
 ]
 
@@ -308,6 +309,7 @@ requires-dist = [
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pydantic", specifier = ">=2.11.5" },
     { name = "pypdf", specifier = ">=5.6.0" },
+    { name = "pytest-cov", specifier = ">=6.2.1" },
     { name = "sentence-transformers", specifier = ">=4.1.0" },
 ]
 

@@ -18,6 +18,7 @@ dependencies = [
     "pre-commit>=4.2.0",
     "pydantic>=2.11.5",
     "pypdf>=5.6.0",
+    "pytest-cov>=6.2.1",
     "sentence-transformers>=4.1.0",
 ]
 
@@ -68,9 +69,15 @@ markers = [
 exclude_also = [
     'pragma: no cover',
     'if __name__ == .__main__.:\n    main()',
+    'def __repr__',
+    'raise NotImplementedError',
+    'pass',
+    'raise ImportError',
+    'except ImportError',
 ]
 omit = [
     "*/aws_fis_mcp_server/models.py",
+    "*/aws_fis_mcp_server/consts.py",
 ]
 
 [tool.coverage.run]
