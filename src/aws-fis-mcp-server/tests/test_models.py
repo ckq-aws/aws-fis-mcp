@@ -269,6 +269,7 @@ class TestExperimentTemplateRequest:
         assert 'Instances' in request.targets
         assert 'StopInstances' in request.actions
         assert request.role_arn == 'arn:aws:iam::123456789012:role/FisRole'
+        assert request.log_configuration is not None
         assert request.log_configuration.log_schema_version == 1
         assert request.experiment_options == {'actionsMode': 'run-all'}
         assert request.report_configuration == {
