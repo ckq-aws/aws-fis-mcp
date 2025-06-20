@@ -14,7 +14,6 @@
 
 """Tests for the AWS FIS MCP server package initialization."""
 
-import pytest
 import awslabs.aws_fis_mcp_server
 
 

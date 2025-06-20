@@ -15,18 +15,18 @@
 """Tests for data models in the AWS FIS MCP server."""
 
 import pytest
-from pydantic import ValidationError
 from awslabs.aws_fis_mcp_server.models import (
-    ExperimentState,
+    Action,
     ExperimentActionsMode,
+    ExperimentState,
+    ExperimentTemplateRequest,
+    LogConfiguration,
+    ResourceExplorerViewRequest,
+    StartExperimentRequest,
     StopCondition,
     Target,
-    Action,
-    LogConfiguration,
-    ExperimentTemplateRequest,
-    StartExperimentRequest,
-    ResourceExplorerViewRequest,
 )
+from pydantic import ValidationError
 
 
 class TestExperimentState:
@@ -55,7 +55,10 @@ class TestStopCondition:
 
     def test_valid_stop_condition(self):
         """Test creating a valid StopCondition."""
-        stop_condition = StopCondition(source='aws:cloudwatch:alarm', value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm')
+        stop_condition = StopCondition(
+            source='aws:cloudwatch:alarm',
+            value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm',
+        )
         assert stop_condition.source == 'aws:cloudwatch:alarm'
         assert stop_condition.value == 'arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm'
 
@@ -88,9 +91,7 @@ class TestTarget:
         """Test creating a valid Target with resource ARNs."""
         arns = ['arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567']
         target = Target(
-            resource_type='aws:ec2:instance',
-            selection_mode='COUNT(1)',
-            resource_arns=arns
+            resource_type='aws:ec2:instance', selection_mode='COUNT(1)', resource_arns=arns
         )
         assert target.resource_type == 'aws:ec2:instance'
         assert target.selection_mode == 'COUNT(1)'
@@ -99,11 +100,7 @@ class TestTarget:
     def test_valid_target_with_tags(self):
         """Test creating a valid Target with resource tags."""
         tags = {'Environment': 'Test', 'Name': 'TestInstance'}
-        target = Target(
-            resource_type='aws:ec2:instance',
-            selection_mode='ALL',
-            resource_tags=tags
-        )
+        target = Target(resource_type='aws:ec2:instance', selection_mode='ALL', resource_tags=tags)
         assert target.resource_type == 'aws:ec2:instance'
         assert target.selection_mode == 'ALL'
         assert target.resource_tags == tags
@@ -111,11 +108,7 @@ class TestTarget:
     def test_valid_target_with_filters(self):
         """Test creating a valid Target with filters."""
         filters = [{'Path': 'State.Name', 'Values': ['running']}]
-        target = Target(
-            resource_type='aws:ec2:instance',
-            selection_mode='ALL',
-            filters=filters
-        )
+        target = Target(resource_type='aws:ec2:instance', selection_mode='ALL', filters=filters)
         assert target.resource_type == 'aws:ec2:instance'
         assert target.selection_mode == 'ALL'
         assert target.filters == filters
@@ -124,9 +117,7 @@ class TestTarget:
         """Test creating a valid Target with parameters."""
         parameters = {'AvailabilityZone': 'us-east-1a'}
         target = Target(
-            resource_type='aws:ec2:instance',
-            selection_mode='ALL',
-            parameters=parameters
+            resource_type='aws:ec2:instance', selection_mode='ALL', parameters=parameters
         )
         assert target.resource_type == 'aws:ec2:instance'
         assert target.selection_mode == 'ALL'
@@ -163,7 +154,7 @@ class TestAction:
             description='Stop EC2 instances',
             parameters={'durationSeconds': '300'},
             targets={'Instances': 'my-target'},
-            start_after=['action-1', 'action-2']
+            start_after=['action-1', 'action-2'],
         )
         assert action.action_id == 'aws:ec2:stop-instances'
         assert action.description == 'Stop EC2 instances'
@@ -189,10 +180,11 @@ class TestLogConfiguration:
 
     def test_valid_log_configuration_with_cloudwatch(self):
         """Test creating a valid LogConfiguration with CloudWatch configuration."""
-        cloudwatch_config = {'LogGroupArn': 'arn:aws:logs:us-east-1:123456789012:log-group:test-group'}
+        cloudwatch_config = {
+            'LogGroupArn': 'arn:aws:logs:us-east-1:123456789012:log-group:test-group'
+        }
         log_config = LogConfiguration(
-            log_schema_version=1,
-            cloud_watch_logs_configuration=cloudwatch_config
+            log_schema_version=1, cloud_watch_logs_configuration=cloudwatch_config
         )
         assert log_config.log_schema_version == 1
         assert log_config.cloud_watch_logs_configuration == cloudwatch_config
@@ -201,10 +193,7 @@ class TestLogConfiguration:
     def test_valid_log_configuration_with_s3(self):
         """Test creating a valid LogConfiguration with S3 configuration."""
         s3_config = {'BucketName': 'test-bucket', 'Prefix': 'logs/'}
-        log_config = LogConfiguration(
-            log_schema_version=1,
-            s3_configuration=s3_config
-        )
+        log_config = LogConfiguration(log_schema_version=1, s3_configuration=s3_config)
         assert log_config.log_schema_version == 1
         assert log_config.cloud_watch_logs_configuration is None
         assert log_config.s3_configuration == s3_config
@@ -220,19 +209,22 @@ class TestExperimentTemplateRequest:
 
     def test_valid_experiment_template_request_minimal(self):
         """Test creating a valid ExperimentTemplateRequest with minimal fields."""
-        stop_condition = StopCondition(source='aws:cloudwatch:alarm', value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm')
+        stop_condition = StopCondition(
+            source='aws:cloudwatch:alarm',
+            value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm',
+        )
         target = Target(resource_type='aws:ec2:instance', selection_mode='ALL')
         action = Action(action_id='aws:ec2:stop-instances')
-        
+
         request = ExperimentTemplateRequest(
             client_token='test-token',
             description='Test template',
             stop_conditions=[stop_condition],
             targets={'Instances': target},
             actions={'StopInstances': action},
-            role_arn='arn:aws:iam::123456789012:role/FisRole'
+            role_arn='arn:aws:iam::123456789012:role/FisRole',
         )
-        
+
         assert request.client_token == 'test-token'
         assert request.description == 'Test template'
         assert len(request.stop_conditions) == 1
@@ -247,11 +239,14 @@ class TestExperimentTemplateRequest:
 
     def test_valid_experiment_template_request_with_all_fields(self):
         """Test creating a valid ExperimentTemplateRequest with all fields."""
-        stop_condition = StopCondition(source='aws:cloudwatch:alarm', value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm')
+        stop_condition = StopCondition(
+            source='aws:cloudwatch:alarm',
+            value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm',
+        )
         target = Target(resource_type='aws:ec2:instance', selection_mode='ALL')
         action = Action(action_id='aws:ec2:stop-instances')
         log_config = LogConfiguration(log_schema_version=1)
-        
+
         request = ExperimentTemplateRequest(
             client_token='test-token',
             description='Test template',
@@ -262,9 +257,11 @@ class TestExperimentTemplateRequest:
             role_arn='arn:aws:iam::123456789012:role/FisRole',
             log_configuration=log_config,
             experiment_options={'actionsMode': 'run-all'},
-            report_configuration={'s3Configuration': {'bucketName': 'test-bucket', 'prefix': 'reports/'}}
+            report_configuration={
+                's3Configuration': {'bucketName': 'test-bucket', 'prefix': 'reports/'}
+            },
         )
-        
+
         assert request.client_token == 'test-token'
         assert request.description == 'Test template'
         assert request.tags == {'Name': 'Test Template', 'Environment': 'Test'}
@@ -274,17 +271,22 @@ class TestExperimentTemplateRequest:
         assert request.role_arn == 'arn:aws:iam::123456789012:role/FisRole'
         assert request.log_configuration.log_schema_version == 1
         assert request.experiment_options == {'actionsMode': 'run-all'}
-        assert request.report_configuration == {'s3Configuration': {'bucketName': 'test-bucket', 'prefix': 'reports/'}}
+        assert request.report_configuration == {
+            's3Configuration': {'bucketName': 'test-bucket', 'prefix': 'reports/'}
+        }
 
     def test_missing_required_fields(self):
         """Test validation error when required fields are missing."""
         with pytest.raises(ValidationError):
             ExperimentTemplateRequest()
 
-        stop_condition = StopCondition(source='aws:cloudwatch:alarm', value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm')
+        stop_condition = StopCondition(
+            source='aws:cloudwatch:alarm',
+            value='arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm',
+        )
         target = Target(resource_type='aws:ec2:instance', selection_mode='ALL')
         action = Action(action_id='aws:ec2:stop-instances')
-        
+
         # Missing client_token
         with pytest.raises(ValidationError):
             ExperimentTemplateRequest(
@@ -292,9 +294,9 @@ class TestExperimentTemplateRequest:
                 stop_conditions=[stop_condition],
                 targets={'Instances': target},
                 actions={'StopInstances': action},
-                role_arn='arn:aws:iam::123456789012:role/FisRole'
+                role_arn='arn:aws:iam::123456789012:role/FisRole',
             )
-        
+
         # Missing description
         with pytest.raises(ValidationError):
             ExperimentTemplateRequest(
@@ -302,7 +304,7 @@ class TestExperimentTemplateRequest:
                 stop_conditions=[stop_condition],
                 targets={'Instances': target},
                 actions={'StopInstances': action},
-                role_arn='arn:aws:iam::123456789012:role/FisRole'
+                role_arn='arn:aws:iam::123456789012:role/FisRole',
             )
 
 
@@ -327,7 +329,7 @@ class TestStartExperimentRequest:
             action=ExperimentActionsMode.RUN_ALL,
             max_timeout_seconds=1800,
             initial_poll_interval=10,
-            max_poll_interval=30
+            max_poll_interval=30,
         )
         assert request.id == 'template-1'
         assert request.tags == {'Environment': 'Test', 'Project': 'Coverage'}
@@ -347,10 +349,7 @@ class TestResourceExplorerViewRequest:
 
     def test_valid_resource_explorer_view_request_minimal(self):
         """Test creating a valid ResourceExplorerViewRequest with minimal fields."""
-        request = ResourceExplorerViewRequest(
-            query='service:ec2',
-            view_name='test-view'
-        )
+        request = ResourceExplorerViewRequest(query='service:ec2', view_name='test-view')
         assert request.query == 'service:ec2'
         assert request.view_name == 'test-view'
         assert request.tags is None
@@ -364,7 +363,7 @@ class TestResourceExplorerViewRequest:
             view_name='test-view',
             tags={'Name': 'Test View', 'Environment': 'Test'},
             scope='arn:aws:iam::123456789012:root',
-            client_token='test-token-123'
+            client_token='test-token-123',
         )
         assert request.query == 'service:ec2'
         assert request.view_name == 'test-view'

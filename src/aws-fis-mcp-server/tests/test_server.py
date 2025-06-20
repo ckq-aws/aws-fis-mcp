@@ -14,15 +14,12 @@
 
 """Tests for the AWS FIS MCP server implementation."""
 
-import pytest
-import asyncio
-import time
-from unittest.mock import MagicMock, patch, AsyncMock
-from botocore.exceptions import ClientError
-from fastmcp import Context
-
 # Import the server module to patch its components
 import awslabs.aws_fis_mcp_server.server as server_module
+import pytest
+import time
+from botocore.exceptions import ClientError
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestAwsFisActions:
@@ -34,10 +31,12 @@ class TestAwsFisActions:
         # Create mock for AWS clients
         self.mock_aws_fis = MagicMock()
         self.mock_context = AsyncMock()
-        
+
         # Patch the AWS clients in the server module
-        with patch.object(server_module, 'aws_fis', self.mock_aws_fis), \
-             patch.object(server_module, 'Context', self.mock_context):
+        with (
+            patch.object(server_module, 'aws_fis', self.mock_aws_fis),
+            patch.object(server_module, 'Context', self.mock_context),
+        ):
             yield
 
     @pytest.mark.asyncio
@@ -79,7 +78,9 @@ class TestAwsFisActions:
                 while 'nextToken' in response:
                     response = self.mock_aws_fis.list_experiments(nextToken=response['nextToken'])
                     for item in response.get('experiments', []):
-                        experiment_name = item.get('tags', {}).get('Name', item.get('id', 'Unknown'))
+                        experiment_name = item.get('tags', {}).get(
+                            'Name', item.get('id', 'Unknown')
+                        )
                         formatted_results[experiment_name] = {
                             'id': item.get('id'),
                             'arn': str(item.get('arn')),
@@ -159,7 +160,9 @@ class TestAwsFisActions:
                 while 'nextToken' in response:
                     response = self.mock_aws_fis.list_experiments(nextToken=response['nextToken'])
                     for item in response.get('experiments', []):
-                        experiment_name = item.get('tags', {}).get('Name', item.get('id', 'Unknown'))
+                        experiment_name = item.get('tags', {}).get(
+                            'Name', item.get('id', 'Unknown')
+                        )
                         formatted_results[experiment_name] = {
                             'id': item.get('id'),
                             'arn': str(item.get('arn')),
@@ -218,7 +221,9 @@ class TestAwsFisActions:
                 while 'nextToken' in response:
                     response = self.mock_aws_fis.list_experiments(nextToken=response['nextToken'])
                     for item in response.get('experiments', []):
-                        experiment_name = item.get('tags', {}).get('Name', item.get('id', 'Unknown'))
+                        experiment_name = item.get('tags', {}).get(
+                            'Name', item.get('id', 'Unknown')
+                        )
                         formatted_results[experiment_name] = {
                             'id': item.get('id'),
                             'arn': str(item.get('arn')),
@@ -296,7 +301,9 @@ class TestAwsFisActions:
 
                 # Handle pagination
                 while 'nextToken' in response:
-                    response = self.mock_aws_fis.list_experiment_templates(nextToken=response['nextToken'])
+                    response = self.mock_aws_fis.list_experiment_templates(
+                        nextToken=response['nextToken']
+                    )
                     all_templates.extend(response.get('experimentTemplates', []))
 
                 return all_templates
@@ -348,27 +355,21 @@ class TestAwsFisActions:
                 tags = tags or {}
 
                 response = self.mock_aws_fis.start_experiment(
-                    experimentTemplateId=id,
-                    experimentOptions={'actionsMode': action},
-                    tags=tags
+                    experimentTemplateId=id, experimentOptions={'actionsMode': action}, tags=tags
                 )
 
                 experiment_id = response['experiment']['id']
-                
+
                 # Get the final state directly without polling
                 status_response = self.mock_aws_fis.get_experiment(id=experiment_id)
-                
+
                 return status_response['experiment']
             except Exception as e:
                 await self.mock_context.error(f'Error in start_experiment: {str(e)}')
                 raise
 
         # Call the test function
-        result = await test_start_experiment(
-            id=template_id,
-            tags=tags,
-            action=action
-        )
+        result = await test_start_experiment(id=template_id, tags=tags, action=action)
 
         # Verify the result
         assert result['id'] == experiment_id
@@ -377,9 +378,7 @@ class TestAwsFisActions:
 
         # Verify the AWS client was called correctly
         self.mock_aws_fis.start_experiment.assert_called_once_with(
-            experimentTemplateId=template_id, 
-            experimentOptions={'actionsMode': action}, 
-            tags=tags
+            experimentTemplateId=template_id, experimentOptions={'actionsMode': action}, tags=tags
         )
         self.mock_aws_fis.get_experiment.assert_called_once_with(id=experiment_id)
 
@@ -394,11 +393,13 @@ class TestResourceDiscovery:
         self.mock_resource_explorer = MagicMock()
         self.mock_cloudformation = MagicMock()
         self.mock_context = AsyncMock()
-        
+
         # Patch the AWS clients in the server module
-        with patch.object(server_module, 'resource_explorer', self.mock_resource_explorer), \
-             patch.object(server_module, 'cloudformation', self.mock_cloudformation), \
-             patch.object(server_module, 'Context', self.mock_context):
+        with (
+            patch.object(server_module, 'resource_explorer', self.mock_resource_explorer),
+            patch.object(server_module, 'cloudformation', self.mock_cloudformation),
+            patch.object(server_module, 'Context', self.mock_context),
+        ):
             yield
 
     @pytest.mark.asyncio
@@ -521,7 +522,9 @@ class TestResourceDiscovery:
 
                 # Handle pagination
                 while 'NextToken' in response:
-                    response = self.mock_resource_explorer.list_views(NextToken=response['NextToken'])
+                    response = self.mock_resource_explorer.list_views(
+                        NextToken=response['NextToken']
+                    )
                     all_views.extend(response.get('Views', []))
 
                 return all_views
@@ -563,9 +566,7 @@ class TestResourceDiscovery:
         client_token = 'test-token-123'
 
         # Define a test function that mimics the original function
-        async def test_create_view(
-            query, view_name, tags=None, scope=None, client_token=None
-        ):
+        async def test_create_view(query, view_name, tags=None, scope=None, client_token=None):
             try:
                 # Default empty dict for tags
                 tags = tags or {}
@@ -589,11 +590,7 @@ class TestResourceDiscovery:
 
         # Call the test function
         result = await test_create_view(
-            query=query,
-            view_name=view_name,
-            tags=tags,
-            scope=scope,
-            client_token=client_token
+            query=query, view_name=view_name, tags=tags, scope=scope, client_token=client_token
         )
 
         # Verify the result
@@ -608,7 +605,7 @@ class TestResourceDiscovery:
             Filters={'FilterString': query},
             Scope=scope,
             Tags=tags,
-            ViewName=view_name
+            ViewName=view_name,
         )
 
 
@@ -621,10 +618,12 @@ class TestExperimentTemplates:
         # Create mock for AWS clients
         self.mock_aws_fis = MagicMock()
         self.mock_context = AsyncMock()
-        
+
         # Patch the AWS clients in the server module
-        with patch.object(server_module, 'aws_fis', self.mock_aws_fis), \
-             patch.object(server_module, 'Context', self.mock_context):
+        with (
+            patch.object(server_module, 'aws_fis', self.mock_aws_fis),
+            patch.object(server_module, 'Context', self.mock_context),
+        ):
             yield
 
     @pytest.mark.asyncio
@@ -647,15 +646,27 @@ class TestExperimentTemplates:
         description = 'Test Template'
         role_arn = 'arn:aws:iam::123456789012:role/FisRole'
         tags = {'Name': 'Test Template', 'Environment': 'Test'}
-        stop_conditions = [{'source': 'aws:cloudwatch:alarm', 'value': 'arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm'}]
+        stop_conditions = [
+            {
+                'source': 'aws:cloudwatch:alarm',
+                'value': 'arn:aws:cloudwatch:us-east-1:123456789012:alarm:test-alarm',
+            }
+        ]
         targets = {'Instances': {'resource_type': 'aws:ec2:instance', 'selection_mode': 'ALL'}}
         actions = {'StopInstances': {'action_id': 'aws:ec2:stop-instances'}}
 
         # Define a test function that mimics the original function
         async def test_create_experiment_template(
-            clientToken, description, role_arn, tags=None, stop_conditions=None,
-            targets=None, actions=None, log_configuration=None, experiment_options=None,
-            report_configuration=None
+            clientToken,
+            description,
+            role_arn,
+            tags=None,
+            stop_conditions=None,
+            targets=None,
+            actions=None,
+            log_configuration=None,
+            experiment_options=None,
+            report_configuration=None,
         ):
             try:
                 # Default empty collections
@@ -674,7 +685,7 @@ class TestExperimentTemplates:
                     tags=tags,
                     logConfiguration=log_configuration,
                     experimentOptions=experiment_options,
-                    experimentReportConfiguration=report_configuration
+                    experimentReportConfiguration=report_configuration,
                 )
                 return response
             except Exception as e:
@@ -689,7 +700,7 @@ class TestExperimentTemplates:
             tags=tags,
             stop_conditions=stop_conditions,
             targets=targets,
-            actions=actions
+            actions=actions,
         )
 
         # Verify the result
@@ -708,5 +719,5 @@ class TestExperimentTemplates:
             actions=actions,
             logConfiguration=None,
             experimentOptions=None,
-            experimentReportConfiguration=None
+            experimentReportConfiguration=None,
         )

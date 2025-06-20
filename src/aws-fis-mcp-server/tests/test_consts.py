@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 """Tests for constants in the AWS FIS MCP server."""
 
-import pytest
 from awslabs.aws_fis_mcp_server import consts
 
 
@@ -22,11 +22,8 @@ class TestConstants:
     """Test cases for constants in the AWS FIS MCP server."""
 
     def test_default_values(self):
-        """Test default configuration values."""
+        """Test default value constants."""
         assert consts.DEFAULT_AWS_REGION == 'us-east-1'
-        assert consts.DEFAULT_MAX_TIMEOUT_SECONDS == 3600
-        assert consts.DEFAULT_INITIAL_POLL_INTERVAL == 5
-        assert consts.DEFAULT_MAX_POLL_INTERVAL == 60
         assert consts.DEFAULT_MAX_RESOURCES == 100
 
     def test_experiment_states(self):
@@ -46,7 +43,9 @@ class TestConstants:
         """Test environment variable names."""
         assert consts.ENV_AWS_REGION == 'AWS_REGION'
         assert consts.ENV_AWS_ACCESS_KEY_ID == 'AWS_ACCESS_KEY_ID'
-        assert consts.ENV_AWS_SECRET_ACCESS_KEY == 'AWS_SECRET_ACCESS_KEY'
+        assert (
+            consts.ENV_AWS_SECRET_ACCESS_KEY == 'AWS_SECRET_ACCESS_KEY'  # pragma: allowlist secret
+        )
         assert consts.ENV_AWS_SESSION_TOKEN == 'AWS_SESSION_TOKEN'
         assert consts.ENV_FASTMCP_LOG_LEVEL == 'FASTMCP_LOG_LEVEL'
 

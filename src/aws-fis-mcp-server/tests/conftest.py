@@ -14,13 +14,12 @@
 
 """Test fixtures for AWS FIS MCP server tests."""
 
-import pytest
-from unittest.mock import MagicMock, patch
-import boto3
-from fastmcp import Context
-
 # Import the server module to patch its components
-import awslabs.aws_fis_mcp_server.server as server_module
+import awslabs.src.aws_fis_mcp_server.server as server_module
+import boto3
+import pytest
+from fastmcp import Context
+from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture
@@ -30,12 +29,13 @@ def mock_aws_clients():
     mock_s3 = MagicMock()
     mock_resource_explorer = MagicMock()
     mock_cloudformation = MagicMock()
-    
-    with patch.object(server_module, 'aws_fis', mock_aws_fis), \
-         patch.object(server_module, 's3', mock_s3), \
-         patch.object(server_module, 'resource_explorer', mock_resource_explorer), \
-         patch.object(server_module, 'cloudformation', mock_cloudformation):
-        
+
+    with (
+        patch.object(server_module, 'aws_fis', mock_aws_fis),
+        patch.object(server_module, 's3', mock_s3),
+        patch.object(server_module, 'resource_explorer', mock_resource_explorer),
+        patch.object(server_module, 'cloudformation', mock_cloudformation),
+    ):
         yield {
             'aws_fis': mock_aws_fis,
             's3': mock_s3,
@@ -48,7 +48,7 @@ def mock_aws_clients():
 def mock_context():
     """Create a mock Context for testing."""
     mock_ctx = MagicMock(spec=Context)
-    
+
     with patch.object(server_module, 'Context', mock_ctx):
         yield mock_ctx
 
@@ -57,6 +57,6 @@ def mock_context():
 def mock_boto3_session():
     """Mock boto3 session for testing."""
     mock_session = MagicMock(spec=boto3.Session)
-    
+
     with patch.object(boto3, 'Session', return_value=mock_session):
         yield mock_session
