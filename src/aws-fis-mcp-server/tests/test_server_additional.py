@@ -19,7 +19,7 @@ import awslabs.aws_fis_mcp_server.server as server_module
 import pytest
 import time
 from botocore.exceptions import ClientError
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestAwsFisActionsAdditional:
@@ -115,7 +115,12 @@ class TestAwsFisActionsAdditional:
 
         # Define a test function that mimics the original function
         async def test_start_experiment(
-            id, tags=None, action='run-all', max_timeout_seconds=3600, initial_poll_interval=5, max_poll_interval=60
+            id,
+            tags=None,
+            action='run-all',
+            max_timeout_seconds=3600,
+            initial_poll_interval=5,
+            max_poll_interval=60,
         ):
             try:
                 # Default to empty dict if tags is None
@@ -146,7 +151,9 @@ class TestAwsFisActionsAdditional:
                         state = status_response['experiment']['state']['status']
 
                         if state in ['pending', 'initiating', 'running']:
-                            await self.mock_context.info(f'Experiment is still active. Current Status: {state}')
+                            await self.mock_context.info(
+                                f'Experiment is still active. Current Status: {state}'
+                            )
                             # Use asyncio.sleep instead of time.sleep to avoid blocking
                             await asyncio.sleep(poll_interval)
 
@@ -166,10 +173,14 @@ class TestAwsFisActionsAdditional:
                                     .get('state', {})
                                     .get('reason', 'Unknown reason')
                                 )
-                                await self.mock_context.error(f'Experiment failed: {error_message}')
+                                await self.mock_context.error(
+                                    f'Experiment failed: {error_message}'
+                                )
                                 raise Exception(f'Experiment failed: {error_message}')
                             else:
-                                await self.mock_context.error(f'Experiment ended with unknown status: {state}')
+                                await self.mock_context.error(
+                                    f'Experiment ended with unknown status: {state}'
+                                )
                                 raise Exception(f'Unknown experiment status: {state}')
 
                     except Exception as e:
@@ -212,7 +223,9 @@ class TestAwsFisActionsAdditional:
         # Verify that Context.info was called for status updates
         assert self.mock_context.info.call_count >= 3
         self.mock_context.info.assert_any_call('Started experiment with ID: exp-1')
-        self.mock_context.info.assert_any_call('Experiment is still active. Current Status: pending')
+        self.mock_context.info.assert_any_call(
+            'Experiment is still active. Current Status: pending'
+        )
         self.mock_context.info.assert_any_call('Experiment completed successfully.')
 
     @pytest.mark.asyncio
@@ -221,7 +234,7 @@ class TestAwsFisActionsAdditional:
         # This is a simplified test that just verifies the error handling logic
         # We'll manually call the error method to ensure it's covered
         await self.mock_context.error('Experiment failed: Test failure reason')
-        
+
         # Verify the error was logged
         self.mock_context.error.assert_called_with('Experiment failed: Test failure reason')
 
@@ -276,9 +289,11 @@ class TestResourceDiscoveryAdditional:
 
                     if stack_name:
                         # Get resources from specific stack
-                        response = self.mock_cloudformation.list_stack_resources(StackName=stack_name)
+                        response = self.mock_cloudformation.list_stack_resources(
+                            StackName=stack_name
+                        )
                         resources = response.get('StackResourceSummaries', [])
-                        
+
                         for resource in resources:
                             result['resources'].append(
                                 {
@@ -340,9 +355,11 @@ class TestResourceDiscoveryAdditional:
 
                     if stack_name:
                         # Get resources from specific stack
-                        response = self.mock_cloudformation.list_stack_resources(StackName=stack_name)
+                        response = self.mock_cloudformation.list_stack_resources(
+                            StackName=stack_name
+                        )
                         resources = response.get('StackResourceSummaries', [])
-                        
+
                         for resource in resources:
                             result['resources'].append(
                                 {
@@ -378,6 +395,7 @@ class TestResourceDiscoveryAdditional:
 
         # Verify that Context.error was called for the error
         self.mock_context.error.assert_called_once()
+
 
 class TestExperimentTemplatesAdditional:
     """Additional test cases for ExperimentTemplates class."""
@@ -509,16 +527,17 @@ class TestExperimentTemplatesAdditional:
             'create_experiment_template',
         )
 
-        # Prepare test parameters
-        client_token = 'test-token'
-        description = 'Test Template'
-        role_arn = 'invalid-role-arn'
+        # No need to prepare test parameters as we're just testing error logging
 
         # Call the error method to ensure it's covered
         await self.mock_context.error('Error creating experiment template: Invalid role ARN')
-        
+
         # Verify the error was logged
-        self.mock_context.error.assert_called_with('Error creating experiment template: Invalid role ARN')
+        self.mock_context.error.assert_called_with(
+            'Error creating experiment template: Invalid role ARN'
+        )
+
+
 class TestResourceDiscoveryAdditional2:
     """Additional test cases for ResourceDiscovery class."""
 
@@ -565,7 +584,9 @@ class TestResourceDiscoveryAdditional2:
                     # Get resources from Resource Explorer
                     try:
                         params = {
-                            'MaxResults': max_results // 2 if source.lower() == 'all' else max_results
+                            'MaxResults': max_results // 2
+                            if source.lower() == 'all'
+                            else max_results
                         }
                         if query:
                             params['QueryString'] = query
@@ -612,7 +633,10 @@ class TestResourceDiscoveryAdditional2:
         assert result['resources'][0]['source'] == 'resource-explorer'
         assert result['resources'][0]['service'] == 'ec2'
         assert result['resources'][0]['resource_type'] == 'AWS::EC2::Instance'
-        assert result['resources'][0]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567'
+        assert (
+            result['resources'][0]['arn']
+            == 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345678901234567'
+        )
         assert result['metadata']['sources_used'] == 'resource-explorer'
 
         # Verify the AWS client was called correctly
@@ -630,7 +654,11 @@ class TestResourceDiscoveryAdditional2:
         )
 
         # Call the warning method to ensure it's covered
-        await self.mock_context.warning('Error searching resources with Resource Explorer: Access denied')
-        
+        await self.mock_context.warning(
+            'Error searching resources with Resource Explorer: Access denied'
+        )
+
         # Verify the warning was logged
-        self.mock_context.warning.assert_called_with('Error searching resources with Resource Explorer: Access denied')
+        self.mock_context.warning.assert_called_with(
+            'Error searching resources with Resource Explorer: Access denied'
+        )
