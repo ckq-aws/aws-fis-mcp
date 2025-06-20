@@ -1,26 +1,20 @@
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union, overload
+from typing import Any, Callable, TypeVar, Union, overload
 
 T = TypeVar('T', bound=Callable[..., Any])
 
 class Context:
     @staticmethod
     async def info(message: str) -> None: ...
-    
     @staticmethod
     async def warning(message: str) -> None: ...
-    
     @staticmethod
     async def error(message: str) -> None: ...
 
 class FastMCP:
     def __init__(self, name: str, instructions: str) -> None: ...
-    
     @overload
     def tool(self, name: str) -> Callable[[T], T]: ...
-    
     @overload
     def tool(self, func: T) -> T: ...
-    
     def tool(self, name_or_func: Union[str, T]) -> Union[Callable[[T], T], T]: ...
-    
     def run(self) -> None: ...

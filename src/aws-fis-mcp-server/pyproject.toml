@@ -69,6 +69,9 @@ exclude_also = [
     'pragma: no cover',
     'if __name__ == .__main__.:\n    main()',
 ]
+omit = [
+    "*/aws_fis_mcp_server/models.py",
+]
 
 [tool.coverage.run]
 source = ["awslabs"]

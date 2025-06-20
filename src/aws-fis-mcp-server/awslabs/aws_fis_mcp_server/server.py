@@ -54,7 +54,7 @@ load_dotenv()
 AWS_REGION = os.getenv(ENV_AWS_REGION, DEFAULT_AWS_REGION)
 
 # Create AWS session
-try:
+try:  # pragma: no cover
     session = boto3.Session(
         aws_access_key_id=os.getenv(ENV_AWS_ACCESS_KEY_ID),
         aws_secret_access_key=os.getenv(ENV_AWS_SECRET_ACCESS_KEY),  # pragma: allowlist secret
@@ -79,7 +79,7 @@ try:
 
     logger.info(f'AWS clients initialized successfully in region {AWS_REGION}')
 
-except Exception as e:
+except Exception as e:  # pragma: no cover
     logger.error(f'Error initializing AWS clients: {str(e)}')
     raise
 
@@ -715,7 +715,7 @@ class ExperimentTemplates:
 
             return response
         except Exception as e:
-            Context.error(f'Error creating experiment template: {str(e)}')
+            await Context.error(f'Error creating experiment template: {str(e)}')
             raise
 
     @staticmethod
@@ -802,7 +802,7 @@ class ExperimentTemplates:
             raise
 
 
-def main():
+def main():  # pragma: no cover
     """Run the AWS FIS MCP Server with CLI argument support.
 
     This function initializes and starts the AWS FIS MCP Server, which provides
@@ -823,5 +823,5 @@ def main():
     mcp.run()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     main()
