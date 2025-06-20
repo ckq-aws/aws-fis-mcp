@@ -16,12 +16,15 @@
 
 import unittest
 from awslabs.aws_fis_mcp_server.models import (
-    Action,
-    ExperimentActionsMode,
     ExperimentState,
-    StartExperimentRequest,
+    ExperimentActionsMode,
     StopCondition,
     Target,
+    Action,
+    LogConfiguration,
+    ExperimentTemplateRequest,
+    StartExperimentRequest,
+    ResourceExplorerViewRequest,
 )
 
 
