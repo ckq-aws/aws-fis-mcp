@@ -46,12 +46,15 @@ AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 AWS_SESSION_TOKEN=your_session_token  # If using temporary credentials
 ```
+## Install uv & python 3.10+
 
-## Setting up the environment
 1. Install uv from [Astral](https://docs.astral.sh/uv/getting-started/installation/) or the [GitHub README](https://github.com/astral-sh/uv#installation)
 2. Install Python 3.10 or newer using `uv python install 3.10` (or a more recent version)
-3. Change directory `cd src/aws-fis-mcp-server`
-4. Run `uv sync` to install project dependencies
+
+## Setting up the environment
+1. Clone this repo `git clone https://github.com/ckq-aws/aws-fis-mcp.git`
+2. Change directory `cd src/aws-fis-mcp-server`
+3. Run `uv sync` to install project dependencies
 
 ## AWS Documenation MCP Server Installation
 
