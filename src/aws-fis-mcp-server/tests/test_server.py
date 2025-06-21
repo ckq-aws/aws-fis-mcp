@@ -593,7 +593,7 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            result = await ResourceDiscovery.create_view.fn(
+            await ResourceDiscovery.create_view.fn(
                 query=query, view_name=view_name, client_token=None
             )
 
