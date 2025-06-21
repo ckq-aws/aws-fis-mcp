@@ -16,6 +16,8 @@ The server provides the following MCP tools:
 - `list_experiment_templates`: Lists all experiment templates
 - `get_experiment_template`: Gets details about a specific template
 - `start_experiment`: Starts an experiment and monitors its status
+- `create_experiment_template`: Creates an FIS experiment template
+- `update_experiment_template`: Updates an existing FIS experiment template
 
 ### AWS Resource Discovery Tools
    ### CloudFormation Tools
