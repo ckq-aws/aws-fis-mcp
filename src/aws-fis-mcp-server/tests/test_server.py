@@ -15,9 +15,8 @@
 """Comprehensive tests for the AWS FIS MCP server implementation."""
 
 import awslabs.aws_fis_mcp_server.server as server_module
-import itertools
 import pytest
-from awslabs.aws_fis_mcp_server.server import AwsFisActions, ResourceDiscovery, ExperimentTemplates
+from awslabs.aws_fis_mcp_server.server import AwsFisActions, ExperimentTemplates, ResourceDiscovery
 from botocore.exceptions import ClientError
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -250,7 +249,9 @@ class TestAwsFisActions:
         }
 
         with patch('asyncio.sleep', new_callable=AsyncMock):
-            result = await AwsFisActions.start_experiment.fn(id=template_id, max_timeout_seconds=10)
+            result = await AwsFisActions.start_experiment.fn(
+                id=template_id, max_timeout_seconds=10
+            )
             assert result['state']['status'] == 'stopped'
 
     @pytest.mark.asyncio
@@ -274,16 +275,10 @@ class TestAwsFisActions:
         """Test listing experiment templates with pagination."""
         self.mock_aws_fis.list_experiment_templates.side_effect = [
             {
-                'experimentTemplates': [
-                    {'id': 'template-1', 'description': 'Template 1'}
-                ],
+                'experimentTemplates': [{'id': 'template-1', 'description': 'Template 1'}],
                 'nextToken': 'token1',
             },
-            {
-                'experimentTemplates': [
-                    {'id': 'template-2', 'description': 'Template 2'}
-                ]
-            },
+            {'experimentTemplates': [{'id': 'template-2', 'description': 'Template 2'}]},
         ]
 
         result = await AwsFisActions.list_experiment_templates.fn()
@@ -423,7 +418,6 @@ class TestResourceDiscovery:
         assert result['View']['ViewName'] == view_name
         self.mock_resource_explorer.create_view.assert_called_once()
 
-
     @pytest.mark.asyncio
     async def test_discover_resources_resource_explorer_only(self):
         """Test discovering resources from Resource Explorer only."""
@@ -448,11 +442,10 @@ class TestResourceDiscovery:
         assert result['resources'][0]['source'] == 'resource-explorer'
         assert result['resources'][0]['service'] == 'ec2'
 
-
     @pytest.mark.asyncio
     async def test_discover_resources_cloudformation_missing_stack_name(self):
         """Test error when CloudFormation source is specified without stack name."""
-        with pytest.raises(ValueError, match="stack_name is required"):
+        with pytest.raises(ValueError, match='stack_name is required'):
             await ResourceDiscovery.discover_resources.fn(source='cloudformation', stack_name=None)
 
     @pytest.mark.asyncio
@@ -460,16 +453,10 @@ class TestResourceDiscovery:
         """Test listing CloudFormation stacks with pagination."""
         self.mock_cloudformation.list_stacks.side_effect = [
             {
-                'StackSummaries': [
-                    {'StackName': 'stack-1', 'StackStatus': 'CREATE_COMPLETE'}
-                ],
+                'StackSummaries': [{'StackName': 'stack-1', 'StackStatus': 'CREATE_COMPLETE'}],
                 'NextToken': 'token1',
             },
-            {
-                'StackSummaries': [
-                    {'StackName': 'stack-2', 'StackStatus': 'UPDATE_COMPLETE'}
-                ]
-            },
+            {'StackSummaries': [{'StackName': 'stack-2', 'StackStatus': 'UPDATE_COMPLETE'}]},
         ]
 
         result = await ResourceDiscovery.list_cfn_stacks.fn()
@@ -546,16 +533,10 @@ class TestResourceDiscovery:
         """Test listing Resource Explorer views with pagination."""
         self.mock_resource_explorer.list_views.side_effect = [
             {
-                'Views': [
-                    {'ViewName': 'view-1', 'Filters': {'FilterString': 'service:ec2'}}
-                ],
+                'Views': [{'ViewName': 'view-1', 'Filters': {'FilterString': 'service:ec2'}}],
                 'NextToken': 'token1',
             },
-            {
-                'Views': [
-                    {'ViewName': 'view-2', 'Filters': {'FilterString': 'service:s3'}}
-                ]
-            },
+            {'Views': [{'ViewName': 'view-2', 'Filters': {'FilterString': 'service:s3'}}]},
         ]
 
         result = await ResourceDiscovery.list_views.fn()
@@ -592,9 +573,7 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            result = await ResourceDiscovery.create_view.fn(
-                query=query, view_name=view_name
-            )
+            result = await ResourceDiscovery.create_view.fn(query=query, view_name=view_name)
 
         assert 'View' in result
         assert result['View']['ViewName'] == view_name
@@ -609,9 +588,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await ResourceDiscovery.create_view.fn(
-                query='service:ec2', view_name='invalid-view'
-            )
+            await ResourceDiscovery.create_view.fn(query='service:ec2', view_name='invalid-view')
 
         self.mock_context.error.assert_called_once()
 
@@ -647,9 +624,12 @@ class TestResourceDiscovery:
 
         assert 'resources' in result
         assert len(result['resources']) == 2
-        assert result['resources'][0]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345'
-        assert result['resources'][1]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-67890'
-
+        assert (
+            result['resources'][0]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345'
+        )
+        assert (
+            result['resources'][1]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-67890'
+        )
 
     @pytest.mark.asyncio
     async def test_discover_resources_resource_explorer_error(self):
