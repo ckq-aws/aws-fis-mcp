@@ -648,6 +648,45 @@ class TestResourceDiscovery:
         assert len(result['resources']) == 0
         self.mock_context.warning.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_discover_resources_max_results_with_pagination(self):
+        """Test resource discovery hitting max_results limit during pagination."""
+        query = 'service:ec2'
+
+        # Mock paginated response - first call returns 1 resource with NextToken, second call returns 2 more
+        self.mock_resource_explorer.search.side_effect = [
+            {
+                'Resources': [
+                    {
+                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-1',
+                        'ResourceType': 'ec2:instance',
+                    }
+                ],
+                'NextToken': 'token1',
+            },
+            {
+                'Resources': [
+                    {
+                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-2',
+                        'ResourceType': 'ec2:instance',
+                    },
+                    {
+                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-3',
+                        'ResourceType': 'ec2:instance',
+                    },
+                ]
+            },
+        ]
+
+        result = await ResourceDiscovery.discover_resources.fn(
+            source='resource-explorer', query=query, max_results=2
+        )
+
+        assert 'resources' in result
+        assert (
+            len(result['resources']) == 2
+        )  # Should break when hitting max_results during pagination
+
 
 class TestExperimentTemplates:
     """Test cases for ExperimentTemplates class."""
