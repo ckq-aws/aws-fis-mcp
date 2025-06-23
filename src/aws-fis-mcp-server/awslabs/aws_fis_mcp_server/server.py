@@ -111,9 +111,8 @@ class AwsFisActions:
     for long-running operations and proper pagination handling for list operations.
     """
 
-    @staticmethod
     @mcp.tool(name='list_fis_experiments')
-    async def list_all_fis_experiments() -> Dict[str, Dict[str, Any]]:
+    async def list_all_fis_experiments(self, ctx: Context) -> Dict[str, Dict[str, Any]]:
         """Retrieves a list of Experiments available in the AWS FIS service.
 
         This tool fetches all FIS experiments in the current AWS account and region,
@@ -153,12 +152,13 @@ class AwsFisActions:
 
             return formatted_results
         except Exception as e:
-            await Context.error(f'Error listing FIS experiments: {str(e)}')
+            await ctx.error(f'Error listing FIS experiments: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='get_experiment')
     async def get_experiment_details(
+        self,
+        ctx: Context,
         id: str = Field(..., description='The experiment ID to retrieve details for'),
     ) -> Dict[str, Any]:
         """Get detailed information about a specific experiment.
@@ -167,6 +167,7 @@ class AwsFisActions:
         identified by its ID.
 
         Args:
+            ctx: The MCP context for logging and communication
             id: The experiment ID
 
         Returns:
@@ -176,12 +177,11 @@ class AwsFisActions:
             response = aws_fis.get_experiment(id=id)
             return response.get('experiment', {})
         except Exception as e:
-            await Context.error(f'Error getting experiment details: {str(e)}')
+            await ctx.error(f'Error getting experiment details: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='list_experiment_templates')
-    async def list_experiment_templates() -> List[Dict[str, Any]]:
+    async def list_experiment_templates(self, ctx: Context) -> List[Dict[str, Any]]:
         """List all experiment templates.
 
         This tool retrieves all FIS experiment templates in the current AWS account and region.
@@ -202,12 +202,13 @@ class AwsFisActions:
 
             return all_templates
         except Exception as e:
-            await Context.error(f'Error listing experiment templates: {str(e)}')
+            await ctx.error(f'Error listing experiment templates: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='get_experiment_template')
     async def get_experiment_template(
+        self,
+        ctx: Context,
         id: str = Field(..., description='The experiment template ID to retrieve'),
     ) -> Dict[str, Any]:
         """Get detailed information about a specific experiment template.
@@ -216,6 +217,7 @@ class AwsFisActions:
         identified by its ID.
 
         Args:
+            ctx: The MCP context for logging and communication
             id: The experiment template ID
 
         Returns:
@@ -225,12 +227,13 @@ class AwsFisActions:
             response = aws_fis.get_experiment_template(id=id)
             return response
         except Exception as e:
-            await Context.error(f'Error getting experiment template: {str(e)}')
+            await ctx.error(f'Error getting experiment template: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool('start_experiment')
     async def start_experiment(
+        self,
+        ctx: Context,
         id: str = Field(..., description='The experiment template ID to execute'),
         tags: Optional[Dict[str, str]] = Field(
             None, description='Optional tags to apply to the experiment'
@@ -253,6 +256,7 @@ class AwsFisActions:
         """Starts an AWS FIS experiment and polls its status until completion.
 
         Args:
+            ctx: The MCP context for logging and communication
             id: The experiment template ID
             tags: Optional tags to apply to the experiment
             action: The actions mode (default: 'run-all')
@@ -276,7 +280,7 @@ class AwsFisActions:
             )
 
             experiment_id = response['experiment']['id']
-            await Context.info(f'Started experiment with ID: {experiment_id}')
+            await ctx.info(f'Started experiment with ID: {experiment_id}')
 
             # Track polling with exponential backoff
             start_time = time.time()
@@ -286,7 +290,7 @@ class AwsFisActions:
             while True:
                 # Check if we've exceeded timeout
                 if time.time() - start_time > max_timeout_seconds:
-                    await Context.error(
+                    await ctx.error(
                         f'Experiment polling timed out after {max_timeout_seconds} seconds'
                     )
                     raise TimeoutError(f'Experiment {experiment_id} polling timed out')
@@ -296,7 +300,7 @@ class AwsFisActions:
                     state = status_response['experiment']['state']['status']
 
                     if state in ['pending', 'initiating', 'running']:
-                        await Context.info(f'Experiment is still active. Current Status: {state}')
+                        await ctx.info(f'Experiment is still active. Current Status: {state}')
                         # Use asyncio.sleep instead of time.sleep to avoid blocking
                         await asyncio.sleep(poll_interval)
 
@@ -305,10 +309,10 @@ class AwsFisActions:
                     else:
                         # Handle terminal states
                         if state == 'completed':
-                            await Context.info('Experiment completed successfully.')
+                            await ctx.info('Experiment completed successfully.')
                             return status_response['experiment']
                         elif state == 'stopped':
-                            await Context.warning('Experiment was stopped.')
+                            await ctx.warning('Experiment was stopped.')
                             return status_response['experiment']
                         elif state == 'failed':
                             error_message = (
@@ -316,25 +320,23 @@ class AwsFisActions:
                                 .get('state', {})
                                 .get('reason', 'Unknown reason')
                             )
-                            await Context.error(f'Experiment failed: {error_message}')
+                            await ctx.error(f'Experiment failed: {error_message}')
                             raise Exception(f'Experiment failed: {error_message}')
                         else:
-                            await Context.error(f'Experiment ended with unknown status: {state}')
+                            await ctx.error(f'Experiment ended with unknown status: {state}')
                             raise Exception(f'Unknown experiment status: {state}')
 
                 except Exception as e:
                     if 'experiment not found' in str(e).lower():
-                        await Context.error(f'Experiment {experiment_id} not found')
+                        await ctx.error(f'Experiment {experiment_id} not found')
                         raise
 
                     # For transient errors, log and continue polling
-                    await Context.warning(
-                        f'Error polling experiment status: {str(e)}. Retrying...'
-                    )
+                    await ctx.warning(f'Error polling experiment status: {str(e)}. Retrying...')
                     await asyncio.sleep(poll_interval)
 
         except Exception as e:
-            await Context.error(f'Error in start_experiment: {str(e)}')
+            await ctx.error(f'Error in start_experiment: {str(e)}')
             raise
 
 
@@ -355,9 +357,10 @@ class ResourceDiscovery:
     provisioned.
     """
 
-    @staticmethod
     @mcp.tool(name='discover_resources')
     async def discover_resources(
+        self,
+        ctx: Context,
         source: str = Field(
             ...,
             description="Source to discover resources from: 'cloudformation', 'resource-explorer', or 'all'",
@@ -380,6 +383,7 @@ class ResourceDiscovery:
         or both, providing a comprehensive view of available resources for fault injection.
 
         Args:
+            ctx: The MCP context for logging and communication
             source: Source to discover resources from ('cloudformation', 'resource-explorer', or 'all')
             stack_name: Name of the CloudFormation stack (required if source is 'cloudformation')
             query: Filter query for Resource Explorer (optional for 'resource-explorer' source)
@@ -388,7 +392,7 @@ class ResourceDiscovery:
         Returns:
             Dict containing discovered resources organized by source
         """
-        result = {'resources': []}
+        result: Dict[str, Any] = {'resources': []}
 
         try:
             if source.lower() in ['cloudformation', 'all']:
@@ -397,7 +401,7 @@ class ResourceDiscovery:
 
                 if stack_name:
                     # Get resources from specific stack
-                    cfn_resources = await ResourceDiscovery.get_stack_resources(stack_name)
+                    cfn_resources = await self.get_stack_resources(ctx, stack_name)
                     for resource in cfn_resources.get('resources', []):
                         result['resources'].append(
                             {
@@ -411,16 +415,14 @@ class ResourceDiscovery:
                         )
                 elif source.lower() == 'all':
                     # List all stacks and get their resources
-                    stacks_response = await ResourceDiscovery.list_cfn_stacks()
+                    stacks_response = await self.list_cfn_stacks(ctx)
                     stacks = stacks_response.get('stacks', [])
 
                     # Limit the number of stacks to process to avoid timeouts
                     for stack in stacks[: min(5, len(stacks))]:
                         stack_name = stack.get('StackName')
                         try:
-                            stack_resources = await ResourceDiscovery.get_stack_resources(
-                                stack_name
-                            )
+                            stack_resources = await self.get_stack_resources(ctx, stack_name)
                             for resource in stack_resources.get('resources', [])[
                                 : max_results // 2
                             ]:  # Limit resources per stack
@@ -435,14 +437,14 @@ class ResourceDiscovery:
                                     }
                                 )
                         except Exception as e:
-                            await Context.warning(
+                            await ctx.warning(
                                 f'Error getting resources for stack {stack_name}: {str(e)}'
                             )
 
             if source.lower() in ['resource-explorer', 'all']:
                 # Get resources from Resource Explorer
                 try:
-                    params = {
+                    params: Dict[str, Any] = {
                         'MaxResults': max_results // 2 if source.lower() == 'all' else max_results
                     }
                     if query:
@@ -479,7 +481,7 @@ class ResourceDiscovery:
                             if len(result['resources']) >= max_results:
                                 break
                 except Exception as e:
-                    await Context.warning(
+                    await ctx.warning(
                         f'Error searching resources with Resource Explorer: {str(e)}'
                     )
 
@@ -492,12 +494,11 @@ class ResourceDiscovery:
 
             return result
         except Exception as e:
-            await Context.error(f'Resource discovery failed: {str(e)}')
+            await ctx.error(f'Resource discovery failed: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='list_cfn_stacks')
-    async def list_cfn_stacks() -> Dict[str, Any]:
+    async def list_cfn_stacks(self, ctx: Context) -> Dict[str, Any]:
         """Retrieve all AWS CloudFormation Stacks.
 
         This tool lists all CloudFormation stacks in the current AWS account and region,
@@ -519,12 +520,13 @@ class ResourceDiscovery:
 
             return {'stacks': all_stacks}
         except Exception as e:
-            await Context.error(f'Error listing CloudFormation stacks: {str(e)}')
+            await ctx.error(f'Error listing CloudFormation stacks: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='get_stack_resources')
     async def get_stack_resources(
+        self,
+        ctx: Context,
         stack_name: str = Field(
             ..., description='Name of the CloudFormation stack to retrieve resources from'
         ),
@@ -535,6 +537,7 @@ class ResourceDiscovery:
         which can be useful for identifying potential targets for fault injection experiments.
 
         Args:
+            ctx: The MCP context for logging and communication
             stack_name: Name of the CloudFormation stack
 
         Returns:
@@ -555,12 +558,11 @@ class ResourceDiscovery:
 
             return {'resources': all_resources}
         except Exception as e:
-            await Context.error(f'Error getting stack resources: {str(e)}')
+            await ctx.error(f'Error getting stack resources: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='list_resource_explorer_views')
-    async def list_views() -> List[Dict[str, Any]]:
+    async def list_views(self, ctx: Context) -> List[Dict[str, Any]]:
         """List Resource Explorer views.
 
         This tool retrieves all Resource Explorer views in the current AWS account and region,
@@ -581,15 +583,16 @@ class ResourceDiscovery:
 
             return all_views
         except Exception as e:
-            await Context.error(f'Error listing Resource Explorer views: {str(e)}')
+            await ctx.error(f'Error listing Resource Explorer views: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='create_resource_explorer_view')
     async def create_view(
+        self,
+        ctx: Context,
         query: str = Field(..., description='Filter string for the view'),
         view_name: str = Field(..., description='Name of the view'),
-        tags: Dict[str, str] = Field(None, description='Tags to apply to the view'),
+        tags: Optional[Dict[str, str]] = Field(None, description='Tags to apply to the view'),
         scope: Optional[str] = Field(None, description='Scope of the view'),
         client_token: Optional[str] = Field(None, description='Client token for idempotency'),
     ) -> Dict[str, Any]:
@@ -599,6 +602,7 @@ class ResourceDiscovery:
         and filter resources for fault injection experiments.
 
         Args:
+            ctx: The MCP context for logging and communication
             query: Filter string for the view
             view_name: Name of the view
             tags: Tags to apply to the view
@@ -626,7 +630,7 @@ class ResourceDiscovery:
 
             return response
         except Exception as e:
-            await Context.error(f'Error creating Resource Explorer view: {str(e)}')
+            await ctx.error(f'Error creating Resource Explorer view: {str(e)}')
             raise
 
 
@@ -645,22 +649,23 @@ class ExperimentTemplates:
     actual fault injection experiments using the AwsFisActions class.
     """
 
-    @staticmethod
     @mcp.tool(name='create_experiment_template')
     async def create_experiment_template(
+        self,
+        ctx: Context,
         clientToken: str = Field(..., description='Client token for idempotency'),
         description: str = Field(..., description='Description of the experiment template'),
         role_arn: str = Field(..., description='IAM role ARN for experiment execution'),
         tags: Optional[Dict[str, str]] = Field(
             None, description='Optional tags to apply to the template'
         ),
-        stop_conditions: List[Dict[str, str]] = Field(
+        stop_conditions: Optional[List[Dict[str, str]]] = Field(
             None, description='Conditions that stop the experiment'
         ),
-        targets: Dict[str, Dict[str, Any]] = Field(
+        targets: Optional[Dict[str, Dict[str, Any]]] = Field(
             None, description='Target resources for the experiment'
         ),
-        actions: Dict[str, Dict[str, Any]] = Field(
+        actions: Optional[Dict[str, Dict[str, Any]]] = Field(
             None, description='Actions to perform during the experiment'
         ),
         log_configuration: Optional[Dict[str, Any]] = Field(
@@ -679,6 +684,7 @@ class ExperimentTemplates:
         fault injection experiments, including targets, actions, and stop conditions.
 
         Args:
+            ctx: The MCP context for logging and communication
             clientToken: Client token for idempotency
             description: Description of the experiment template
             tags: Optional tags to apply to the template
@@ -715,12 +721,13 @@ class ExperimentTemplates:
 
             return response
         except Exception as e:
-            await Context.error(f'Error creating experiment template: {str(e)}')
+            await ctx.error(f'Error creating experiment template: {str(e)}')
             raise
 
-    @staticmethod
     @mcp.tool(name='update_experiment_template')
     async def update_experiment_template(
+        self,
+        ctx: Context,
         id: str = Field(..., description='ID of the experiment template to update'),
         description: Optional[str] = Field(
             None, description='Updated description of the experiment template'
@@ -753,6 +760,7 @@ class ExperimentTemplates:
         fault injection experiments, including targets, actions, and stop conditions.
 
         Args:
+            ctx: The MCP context for logging and communication
             id: ID of the experiment template to update
             description: Updated description of the experiment template
             stop_conditions: Updated conditions that stop the experiment
@@ -768,7 +776,7 @@ class ExperimentTemplates:
         """
         try:
             # Build the update parameters, only including non-None values
-            update_params = {'id': id}
+            update_params: Dict[str, Any] = {'id': id}
 
             if description is not None:
                 update_params['description'] = description
@@ -795,11 +803,17 @@ class ExperimentTemplates:
                 update_params['experimentReportConfiguration'] = experiment_report_configuration
 
             response = aws_fis.update_experiment_template(**update_params)
-            await Context.info(f'Successfully updated experiment template: {id}')
+            await ctx.info(f'Successfully updated experiment template: {id}')
             return response
         except Exception as e:
-            await Context.error(f'Error updating experiment template: {str(e)}')
+            await ctx.error(f'Error updating experiment template: {str(e)}')
             raise
+
+
+# Initialize class instances for MCP tool registration
+aws_fis_actions = AwsFisActions()
+resource_discovery = ResourceDiscovery()
+experiment_templates = ExperimentTemplates()
 
 
 def main():  # pragma: no cover

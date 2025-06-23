@@ -263,7 +263,7 @@ wheels = [
 [[package]]
 name = "awslabs-aws-fis-mcp-server"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "asyncio" },
     { name = "aws-cdk-lib" },
