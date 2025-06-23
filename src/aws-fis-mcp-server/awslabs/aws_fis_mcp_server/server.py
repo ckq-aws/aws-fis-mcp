@@ -67,7 +67,7 @@ try:  # pragma: no cover
         region_name=AWS_REGION,
         signature_version=AWS_CONFIG_SIGNATURE_VERSION,
         retries={'max_attempts': AWS_CONFIG_MAX_ATTEMPTS, 'mode': AWS_CONFIG_RETRY_MODE},
-        user_agent_extra='AWS-FIS-MCP-Server',
+        user_agent_extra=f'awslabs/mcp/aws-fis-mcp-server/{__version__}',
     )
 
     # Initialize AWS clients
