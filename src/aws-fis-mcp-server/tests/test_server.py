@@ -290,7 +290,6 @@ class TestAwsFisActions:
                     self.fis_actions, self.mock_context, id=template_id, max_timeout_seconds=10
                 )
 
-
     @pytest.mark.asyncio
     async def test_list_experiment_templates_with_pagination(self):
         """Test listing experiment templates with pagination."""
@@ -505,6 +504,44 @@ class TestResourceDiscovery:
         assert len(result['resources']) == 0
         # Should have called warning for the error
         self.mock_context.warning.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_discover_resources_cloudformation_with_stack_name(self):
+        """Test discover_resources with cloudformation source and stack name."""
+        stack_name = 'test-stack'
+
+        # Mock get_stack_resources to return some resources
+        mock_resources = {
+            'resources': [
+                {
+                    'ResourceType': 'AWS::EC2::Instance',
+                    'LogicalResourceId': 'MyInstance',
+                    'PhysicalResourceId': 'i-12345',
+                    'ResourceStatus': 'CREATE_COMPLETE',
+                }
+            ]
+        }
+
+        # Create a proper async mock function
+        async def mock_get_stack_resources(ctx, stack_name):
+            return mock_resources
+
+        self.resource_discovery.get_stack_resources = AsyncMock(
+            side_effect=mock_get_stack_resources
+        )
+
+        result = await self.resource_discovery.discover_resources.fn(
+            self.resource_discovery,
+            self.mock_context,
+            source='cloudformation',
+            stack_name=stack_name,
+        )
+
+        # Should have resources from the stack
+        assert 'resources' in result
+        assert len(result['resources']) == 1
+        assert result['resources'][0]['source'] == 'cloudformation'
+        assert result['resources'][0]['stack_name'] == stack_name
 
     @pytest.mark.asyncio
     async def test_list_cfn_stacks_with_pagination(self):
@@ -736,23 +773,6 @@ class TestResourceDiscovery:
         assert (
             result['resources'][1]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-67890'
         )
-
-    @pytest.mark.asyncio
-    async def test_discover_resources_resource_explorer_error(self):
-        """Test discovering resources with Resource Explorer error."""
-        query = 'service:ec2'
-        self.mock_resource_explorer.search.side_effect = ClientError(
-            {'Error': {'Code': 'AccessDenied', 'Message': 'Access denied'}},
-            'search',
-        )
-
-        result = await self.resource_discovery.discover_resources.fn(
-            self.resource_discovery, self.mock_context, source='resource-explorer', query=query
-        )
-
-        assert 'resources' in result
-        assert len(result['resources']) == 0
-        self.mock_context.warning.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_discover_resources_max_results_with_pagination(self):
