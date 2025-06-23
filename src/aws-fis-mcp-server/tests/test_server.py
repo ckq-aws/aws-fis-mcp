@@ -302,10 +302,12 @@ class TestAwsFisActions:
 
         self.mock_aws_fis.get_experiment.side_effect = [
             {'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}},
-            {'experiment': {
-                'id': experiment_id,
-                'state': {'status': 'failed', 'reason': 'Invalid role'},
-            }}
+            {
+                'experiment': {
+                    'id': experiment_id,
+                    'state': {'status': 'failed', 'reason': 'Invalid role'},
+                }
+            },
         ]
 
         with patch('asyncio.sleep', new_callable=AsyncMock):
@@ -326,10 +328,12 @@ class TestAwsFisActions:
 
         self.mock_aws_fis.get_experiment.side_effect = [
             {'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}},
-            {'experiment': {
-                'id': experiment_id,
-                'state': {'status': 'unknown_state'},
-            }}
+            {
+                'experiment': {
+                    'id': experiment_id,
+                    'state': {'status': 'unknown_state'},
+                }
+            },
         ]
 
         with patch('asyncio.sleep', new_callable=AsyncMock):
@@ -555,13 +559,17 @@ class TestResourceDiscovery:
             else:
                 raise Exception('Stack access denied')
 
-        self.resource_discovery.get_stack_resources = AsyncMock(side_effect=mock_get_stack_resources)
-        self.resource_discovery.list_cfn_stacks = AsyncMock(return_value={
-            'stacks': [
-                {'StackName': 'stack-1', 'StackStatus': 'CREATE_COMPLETE'},
-                {'StackName': 'stack-2', 'StackStatus': 'CREATE_COMPLETE'},
-            ]
-        })
+        self.resource_discovery.get_stack_resources = AsyncMock(
+            side_effect=mock_get_stack_resources
+        )
+        self.resource_discovery.list_cfn_stacks = AsyncMock(
+            return_value={
+                'stacks': [
+                    {'StackName': 'stack-1', 'StackStatus': 'CREATE_COMPLETE'},
+                    {'StackName': 'stack-2', 'StackStatus': 'CREATE_COMPLETE'},
+                ]
+            }
+        )
 
         # Mock Resource Explorer search
         self.mock_resource_explorer.search.return_value = {'Resources': []}
