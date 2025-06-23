@@ -31,9 +31,7 @@ class TestAwsFisActions:
         self.mock_context = AsyncMock()
         self.fis_actions = AwsFisActions()
 
-        with (
-            patch.object(server_module, 'aws_fis', self.mock_aws_fis),
-        ):
+        with patch.object(server_module, 'aws_fis', self.mock_aws_fis):
             yield
 
     @pytest.mark.asyncio
@@ -293,6 +291,54 @@ class TestAwsFisActions:
                 )
 
     @pytest.mark.asyncio
+    async def test_start_experiment_failed_state(self):
+        """Test starting an experiment that fails."""
+        template_id = 'template-1'
+        experiment_id = 'exp-1'
+
+        self.mock_aws_fis.start_experiment.return_value = {
+            'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
+        }
+
+        self.mock_aws_fis.get_experiment.side_effect = [
+            {'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}},
+            {'experiment': {
+                'id': experiment_id,
+                'state': {'status': 'failed', 'reason': 'Invalid role'},
+            }}
+        ]
+
+        with patch('asyncio.sleep', new_callable=AsyncMock):
+            with pytest.raises(Exception, match='Experiment failed: Invalid role'):
+                await self.fis_actions.start_experiment.fn(
+                    self.fis_actions, self.mock_context, id=template_id, max_timeout_seconds=10
+                )
+
+    @pytest.mark.asyncio
+    async def test_start_experiment_unknown_state(self):
+        """Test starting an experiment with unknown terminal state."""
+        template_id = 'template-1'
+        experiment_id = 'exp-1'
+
+        self.mock_aws_fis.start_experiment.return_value = {
+            'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
+        }
+
+        self.mock_aws_fis.get_experiment.side_effect = [
+            {'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}},
+            {'experiment': {
+                'id': experiment_id,
+                'state': {'status': 'unknown_state'},
+            }}
+        ]
+
+        with patch('asyncio.sleep', new_callable=AsyncMock):
+            with pytest.raises(Exception, match='Unknown experiment status: unknown_state'):
+                await self.fis_actions.start_experiment.fn(
+                    self.fis_actions, self.mock_context, id=template_id, max_timeout_seconds=10
+                )
+
+    @pytest.mark.asyncio
     async def test_list_experiment_templates_with_pagination(self):
         """Test listing experiment templates with pagination."""
         self.mock_aws_fis.list_experiment_templates.side_effect = [
@@ -490,6 +536,45 @@ class TestResourceDiscovery:
                 source='cloudformation',
                 stack_name=None,
             )
+
+    @pytest.mark.asyncio
+    async def test_discover_resources_all_source_with_stack_error(self):
+        """Test discover_resources with source='all' handling stack resource errors."""
+        # Mock the list_cfn_stacks call
+        self.mock_cloudformation.list_stacks.return_value = {
+            'StackSummaries': [
+                {'StackName': 'stack-1', 'StackStatus': 'CREATE_COMPLETE'},
+                {'StackName': 'stack-2', 'StackStatus': 'CREATE_COMPLETE'},
+            ]
+        }
+
+        # Mock first stack succeeds, second stack fails
+        async def mock_get_stack_resources(ctx, stack_name):
+            if stack_name == 'stack-1':
+                return {'resources': [{'ResourceType': 'AWS::EC2::Instance'}]}
+            else:
+                raise Exception('Stack access denied')
+
+        self.resource_discovery.get_stack_resources = AsyncMock(side_effect=mock_get_stack_resources)
+        self.resource_discovery.list_cfn_stacks = AsyncMock(return_value={
+            'stacks': [
+                {'StackName': 'stack-1', 'StackStatus': 'CREATE_COMPLETE'},
+                {'StackName': 'stack-2', 'StackStatus': 'CREATE_COMPLETE'},
+            ]
+        })
+
+        # Mock Resource Explorer search
+        self.mock_resource_explorer.search.return_value = {'Resources': []}
+
+        result = await self.resource_discovery.discover_resources.fn(
+            self.resource_discovery, self.mock_context, source='all'
+        )
+
+        # Should have resources from the successful stack
+        assert 'resources' in result
+        assert len(result['resources']) >= 1
+        # Should have called warning for the failed stack
+        self.mock_context.warning.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_list_cfn_stacks_with_pagination(self):
@@ -793,9 +878,7 @@ class TestExperimentTemplates:
         self.mock_context = AsyncMock()
         self.experiment_templates = ExperimentTemplates()
 
-        with (
-            patch.object(server_module, 'aws_fis', self.mock_aws_fis),
-        ):
+        with patch.object(server_module, 'aws_fis', self.mock_aws_fis):
             yield
 
     @pytest.mark.asyncio
