@@ -101,5 +101,4 @@ reportFunctionMemberAccess = false
 reportPrivateUsage = false
 reportUnboundVariable = true
 reportGeneralTypeIssues = false
-pythonVersion = "3.10"
 pythonPlatform = "All"
