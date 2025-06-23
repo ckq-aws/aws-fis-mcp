@@ -19,6 +19,7 @@ import boto3
 import os
 import sys
 import time
+from awslabs.aws_fis_mcp_server import __version__
 from awslabs.aws_fis_mcp_server.consts import (
     AWS_CONFIG_MAX_ATTEMPTS,
     AWS_CONFIG_RETRY_MODE,
