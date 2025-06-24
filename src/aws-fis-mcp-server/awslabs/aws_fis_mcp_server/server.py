@@ -26,10 +26,7 @@ from awslabs.aws_fis_mcp_server.consts import (
     AWS_CONFIG_SIGNATURE_VERSION,
     DEFAULT_AWS_REGION,
     DEFAULT_MAX_RESOURCES,
-    ENV_AWS_ACCESS_KEY_ID,
     ENV_AWS_REGION,
-    ENV_AWS_SECRET_ACCESS_KEY,
-    ENV_AWS_SESSION_TOKEN,
     ENV_FASTMCP_LOG_LEVEL,
     SERVICE_CLOUDFORMATION,
     SERVICE_FIS,
@@ -55,11 +52,11 @@ load_dotenv()
 AWS_REGION = os.getenv(ENV_AWS_REGION, DEFAULT_AWS_REGION)
 
 # Create AWS session
-try:  # pragma: no cover
+try:
     session = boto3.Session(
-        aws_access_key_id=os.getenv(ENV_AWS_ACCESS_KEY_ID),
-        aws_secret_access_key=os.getenv(ENV_AWS_SECRET_ACCESS_KEY),  # pragma: allowlist secret
-        aws_session_token=os.getenv(ENV_AWS_SESSION_TOKEN),
+        # aws_access_key_id=os.getenv(ENV_AWS_ACCESS_KEY_ID),
+        # aws_secret_access_key=os.getenv(ENV_AWS_SECRET_ACCESS_KEY),
+        # aws_session_token=os.getenv(ENV_AWS_SESSION_TOKEN),
         region_name=AWS_REGION,
     )
 
@@ -80,7 +77,7 @@ try:  # pragma: no cover
 
     logger.info(f'AWS clients initialized successfully in region {AWS_REGION}')
 
-except Exception as e:  # pragma: no cover
+except Exception as e:
     logger.error(f'Error initializing AWS clients: {str(e)}')
     raise
 
@@ -96,6 +93,8 @@ mcp = FastMCP(
     - Working with CloudFormation stacks
 
     Use these tools to help users design resilient systems through controlled fault injection.
+
+    When invoking methods in the classes do not use the self argument as it is not meant to take arguments but rather refers to the class itself.
     """,
 )
 
@@ -113,7 +112,8 @@ class AwsFisActions:
     """
 
     @mcp.tool(name='list_fis_experiments')
-    async def list_all_fis_experiments(self, ctx: Context) -> Dict[str, Dict[str, Any]]:
+    @staticmethod
+    async def list_all_fis_experiments(ctx: Context) -> Dict[str, Dict[str, Any]]:
         """Retrieves a list of Experiments available in the AWS FIS service.
 
         This tool fetches all FIS experiments in the current AWS account and region,
@@ -157,8 +157,8 @@ class AwsFisActions:
             raise
 
     @mcp.tool(name='get_experiment')
+    @staticmethod
     async def get_experiment_details(
-        self,
         ctx: Context,
         id: str = Field(..., description='The experiment ID to retrieve details for'),
     ) -> Dict[str, Any]:
@@ -182,7 +182,8 @@ class AwsFisActions:
             raise
 
     @mcp.tool(name='list_experiment_templates')
-    async def list_experiment_templates(self, ctx: Context) -> List[Dict[str, Any]]:
+    @staticmethod
+    async def list_experiment_templates(ctx: Context) -> List[Dict[str, Any]]:
         """List all experiment templates.
 
         This tool retrieves all FIS experiment templates in the current AWS account and region.
@@ -207,8 +208,8 @@ class AwsFisActions:
             raise
 
     @mcp.tool(name='get_experiment_template')
+    @staticmethod
     async def get_experiment_template(
-        self,
         ctx: Context,
         id: str = Field(..., description='The experiment template ID to retrieve'),
     ) -> Dict[str, Any]:
@@ -232,8 +233,8 @@ class AwsFisActions:
             raise
 
     @mcp.tool('start_experiment')
+    @staticmethod
     async def start_experiment(
-        self,
         ctx: Context,
         id: str = Field(..., description='The experiment template ID to execute'),
         tags: Optional[Dict[str, str]] = Field(
@@ -359,8 +360,8 @@ class ResourceDiscovery:
     """
 
     @mcp.tool(name='discover_resources')
+    @staticmethod
     async def discover_resources(
-        self,
         ctx: Context,
         source: str = Field(
             ...,
@@ -402,7 +403,7 @@ class ResourceDiscovery:
 
                 if stack_name:
                     # Get resources from specific stack
-                    cfn_resources = await self.get_stack_resources(ctx, stack_name)
+                    cfn_resources = await ResourceDiscovery.get_stack_resources.fn(ctx, stack_name)
                     for resource in cfn_resources.get('resources', []):
                         result['resources'].append(
                             {
@@ -416,14 +417,16 @@ class ResourceDiscovery:
                         )
                 elif source.lower() == 'all':
                     # List all stacks and get their resources
-                    stacks_response = await self.list_cfn_stacks(ctx)
+                    stacks_response = await ResourceDiscovery.list_cfn_stacks.fn(ctx)
                     stacks = stacks_response.get('stacks', [])
 
                     # Limit the number of stacks to process to avoid timeouts
                     for stack in stacks[: min(5, len(stacks))]:
                         stack_name = stack.get('StackName')
                         try:
-                            stack_resources = await self.get_stack_resources(ctx, stack_name)
+                            stack_resources = await ResourceDiscovery.get_stack_resources.fn(
+                                ctx, stack_name
+                            )
                             for resource in stack_resources.get('resources', [])[
                                 : max_results // 2
                             ]:  # Limit resources per stack
@@ -499,7 +502,8 @@ class ResourceDiscovery:
             raise
 
     @mcp.tool(name='list_cfn_stacks')
-    async def list_cfn_stacks(self, ctx: Context) -> Dict[str, Any]:
+    @staticmethod
+    async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
         """Retrieve all AWS CloudFormation Stacks.
 
         This tool lists all CloudFormation stacks in the current AWS account and region,
@@ -525,8 +529,8 @@ class ResourceDiscovery:
             raise
 
     @mcp.tool(name='get_stack_resources')
+    @staticmethod
     async def get_stack_resources(
-        self,
         ctx: Context,
         stack_name: str = Field(
             ..., description='Name of the CloudFormation stack to retrieve resources from'
@@ -563,7 +567,8 @@ class ResourceDiscovery:
             raise
 
     @mcp.tool(name='list_resource_explorer_views')
-    async def list_views(self, ctx: Context) -> List[Dict[str, Any]]:
+    @staticmethod
+    async def list_views(ctx: Context) -> List[Dict[str, Any]]:
         """List Resource Explorer views.
 
         This tool retrieves all Resource Explorer views in the current AWS account and region,
@@ -588,8 +593,8 @@ class ResourceDiscovery:
             raise
 
     @mcp.tool(name='create_resource_explorer_view')
+    @staticmethod
     async def create_view(
-        self,
         ctx: Context,
         query: str = Field(..., description='Filter string for the view'),
         view_name: str = Field(..., description='Name of the view'),
@@ -651,8 +656,8 @@ class ExperimentTemplates:
     """
 
     @mcp.tool(name='create_experiment_template')
+    @staticmethod
     async def create_experiment_template(
-        self,
         ctx: Context,
         clientToken: str = Field(..., description='Client token for idempotency'),
         description: str = Field(..., description='Description of the experiment template'),
@@ -726,8 +731,8 @@ class ExperimentTemplates:
             raise
 
     @mcp.tool(name='update_experiment_template')
+    @staticmethod
     async def update_experiment_template(
-        self,
         ctx: Context,
         id: str = Field(..., description='ID of the experiment template to update'),
         description: Optional[str] = Field(
@@ -817,7 +822,7 @@ resource_discovery = ResourceDiscovery()
 experiment_templates = ExperimentTemplates()
 
 
-def main():  # pragma: no cover
+def main():
     """Run the AWS FIS MCP Server with CLI argument support.
 
     This function initializes and starts the AWS FIS MCP Server, which provides
@@ -838,5 +843,5 @@ def main():  # pragma: no cover
     mcp.run()
 
 
-if __name__ == '__main__':  # pragma: no cover
+if __name__ == '__main__':
     main()
