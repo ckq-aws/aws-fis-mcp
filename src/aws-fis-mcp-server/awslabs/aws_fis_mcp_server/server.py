@@ -35,8 +35,8 @@ from awslabs.aws_fis_mcp_server.consts import (
 )
 from botocore.config import Config
 from dotenv import load_dotenv
-from mcp.server.fastmcp import Context, FastMCP
 from loguru import logger
+from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 from typing import Any, Dict, List, Optional
 
