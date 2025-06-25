@@ -119,9 +119,7 @@ class TestAwsFisActions:
             }
         }
 
-        result = await self.fis_actions.get_experiment_details(
-            self.mock_context, id=experiment_id
-        )
+        result = await self.fis_actions.get_experiment_details(self.mock_context, id=experiment_id)
 
         assert result['id'] == experiment_id
         assert result['state']['status'] == 'completed'
@@ -174,9 +172,7 @@ class TestAwsFisActions:
             }
         }
 
-        result = await self.fis_actions.get_experiment_template(
-            self.mock_context, id=template_id
-        )
+        result = await self.fis_actions.get_experiment_template(self.mock_context, id=template_id)
 
         assert 'experimentTemplate' in result
         assert result['experimentTemplate']['id'] == template_id
