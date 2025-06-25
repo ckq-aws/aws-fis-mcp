@@ -398,7 +398,7 @@ class ResourceDiscovery:
 
                 if stack_name:
                     # Get resources from specific stack
-                    cfn_resources = await ResourceDiscovery.get_stack_resources.fn(ctx, stack_name)
+                    cfn_resources = await ResourceDiscovery.get_stack_resources(ctx, stack_name)
                     for resource in cfn_resources.get('resources', []):
                         result['resources'].append(
                             {
@@ -412,14 +412,14 @@ class ResourceDiscovery:
                         )
                 elif source.lower() == 'all':
                     # List all stacks and get their resources
-                    stacks_response = await ResourceDiscovery.list_cfn_stacks.fn(ctx)
+                    stacks_response = await ResourceDiscovery.list_cfn_stacks(ctx)
                     stacks = stacks_response.get('stacks', [])
 
                     # Limit the number of stacks to process to avoid timeouts
                     for stack in stacks[: min(5, len(stacks))]:
                         stack_name = stack.get('StackName')
                         try:
-                            stack_resources = await ResourceDiscovery.get_stack_resources.fn(
+                            stack_resources = await ResourceDiscovery.get_stack_resources(
                                 ctx, stack_name
                             )
                             for resource in stack_resources.get('resources', [])[
