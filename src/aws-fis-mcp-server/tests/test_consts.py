@@ -42,11 +42,6 @@ class TestConstants:
     def test_environment_variables(self):
         """Test environment variable names."""
         assert consts.ENV_AWS_REGION == 'AWS_REGION'
-        assert consts.ENV_AWS_ACCESS_KEY_ID == 'AWS_ACCESS_KEY_ID'
-        assert (
-            consts.ENV_AWS_SECRET_ACCESS_KEY == 'AWS_SECRET_ACCESS_KEY'  # pragma: allowlist secret
-        )
-        assert consts.ENV_AWS_SESSION_TOKEN == 'AWS_SESSION_TOKEN'
         assert consts.ENV_FASTMCP_LOG_LEVEL == 'FASTMCP_LOG_LEVEL'
 
     def test_aws_service_names(self):
