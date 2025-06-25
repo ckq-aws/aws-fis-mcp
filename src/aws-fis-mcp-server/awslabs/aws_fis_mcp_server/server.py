@@ -51,14 +51,28 @@ load_dotenv()
 # Get region from environment or default to us-east-1
 AWS_REGION = os.getenv(ENV_AWS_REGION, DEFAULT_AWS_REGION)
 
+def create_aws_session(profile: Optional[str] = None) -> boto3.Session:
+    """Create AWS session with optional profile.
+    
+    Args:
+        profile: AWS profile name (optional)
+        
+    Returns:
+        boto3.Session: Configured AWS session
+    """
+    if profile:
+        return boto3.Session(
+            profile_name=profile,
+            region_name=AWS_REGION,
+        )
+    else:
+        return boto3.Session(
+            region_name=AWS_REGION,
+        )
+
 # Create AWS session
 try:
-    session = boto3.Session(
-        # aws_access_key_id=os.getenv(ENV_AWS_ACCESS_KEY_ID),
-        # aws_secret_access_key=os.getenv(ENV_AWS_SECRET_ACCESS_KEY),
-        # aws_session_token=os.getenv(ENV_AWS_SESSION_TOKEN),
-        region_name=AWS_REGION,
-    )
+    session = create_aws_session()
 
     # Create AWS config
     aws_config = Config(
