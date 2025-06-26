@@ -417,6 +417,8 @@ class ResourceDiscovery:
                     # Limit the number of stacks to process to avoid timeouts
                     for stack in stacks[: min(5, len(stacks))]:
                         stack_name = stack.get('StackName')
+                        if not stack_name:
+                            continue
                         try:
                             stack_resources = await ResourceDiscovery.get_stack_resources(
                                 ctx, stack_name
