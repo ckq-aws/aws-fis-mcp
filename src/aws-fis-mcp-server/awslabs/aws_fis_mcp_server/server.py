@@ -35,8 +35,8 @@ from awslabs.aws_fis_mcp_server.consts import (
 )
 from botocore.config import Config
 from dotenv import load_dotenv
+from fastmcp import Context, FastMCP
 from loguru import logger
-from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 from typing import Any, Dict, List, Optional
 
@@ -65,7 +65,6 @@ try:
 
     # Initialize AWS clients
     aws_fis = session.client(SERVICE_FIS, config=aws_config)
-    # Removed Bedrock client as it's no longer needed
     s3 = session.client(SERVICE_S3, config=aws_config)
     resource_explorer = session.client(SERVICE_RESOURCE_EXPLORER, config=aws_config)
     cloudformation = session.client(SERVICE_CLOUDFORMATION, config=aws_config)
@@ -496,7 +495,7 @@ class ResourceDiscovery:
             await ctx.error(f'Resource discovery failed: {str(e)}')
             raise
 
-    @mcp.tool(name='list_cfn_stacks')
+    # @mcp.tool(name='list_cfn_stacks')
     @staticmethod
     async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
         """Retrieve all AWS CloudFormation Stacks.
@@ -510,12 +509,12 @@ class ResourceDiscovery:
         try:
             all_stacks = []
             cfn = cloudformation
-            response = cfn.list_stacks()
+            response = cfn.list_stacks()  # Remove await here
             all_stacks.extend(response.get('StackSummaries', []))
 
             # Handle pagination
             while 'NextToken' in response:
-                response = cfn.list_stacks(NextToken=response['NextToken'])
+                response = cfn.list_stacks(NextToken=response['NextToken'])  # Remove await here
                 all_stacks.extend(response.get('StackSummaries', []))
 
             return {'stacks': all_stacks}
@@ -523,7 +522,7 @@ class ResourceDiscovery:
             await ctx.error(f'Error listing CloudFormation stacks: {str(e)}')
             raise
 
-    @mcp.tool(name='get_stack_resources')
+    # @mcp.tool(name='get_stack_resources')
     @staticmethod
     async def get_stack_resources(
         ctx: Context,
@@ -546,12 +545,12 @@ class ResourceDiscovery:
         try:
             all_resources = []
             cfn = cloudformation
-            response = cfn.list_stack_resources(StackName=stack_name)
+            response = cfn.list_stack_resources(StackName=stack_name)  # Remove await here
             all_resources.extend(response.get('StackResourceSummaries', []))
 
             # Handle pagination
             while 'NextToken' in response:
-                response = cfn.list_stack_resources(
+                response = cfn.list_stack_resources(  # Remove await here
                     StackName=stack_name, NextToken=response['NextToken']
                 )
                 all_resources.extend(response.get('StackResourceSummaries', []))
@@ -561,7 +560,7 @@ class ResourceDiscovery:
             await ctx.error(f'Error getting stack resources: {str(e)}')
             raise
 
-    @mcp.tool(name='list_resource_explorer_views')
+    # @mcp.tool(name='list_resource_explorer_views')
     @staticmethod
     async def list_views(ctx: Context) -> List[Dict[str, Any]]:
         """List Resource Explorer views.
