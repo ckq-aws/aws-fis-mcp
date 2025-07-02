@@ -68,6 +68,7 @@ try:
     s3 = session.client(SERVICE_S3, config=aws_config)
     resource_explorer = session.client(SERVICE_RESOURCE_EXPLORER, config=aws_config)
     cloudformation = session.client(SERVICE_CLOUDFORMATION, config=aws_config)
+    aws_config_client = session.client('config', config=aws_config)
 
     logger.info(f'AWS clients initialized successfully in region {AWS_REGION}')
 
@@ -633,6 +634,105 @@ class ResourceDiscovery:
             return response
         except Exception as e:
             await ctx.error(f'Error creating Resource Explorer view: {str(e)}')
+            raise
+
+    @mcp.tool(name='discover_resource_relationships')
+    @staticmethod
+    async def discover_relationships(
+        ctx: Context,
+        resource_type: str = Field(
+            ...,
+            description='AWS resource type (e.g., AWS::EC2::Instance, AWS::ElasticLoadBalancingV2::LoadBalancer)',
+        ),
+        resource_id: str = Field(..., description='AWS resource ID to discover relationships for'),
+        limit: Optional[int] = Field(
+            10, description='Maximum number of configuration items to retrieve'
+        ),
+        chronological_order: Optional[str] = Field(
+            'Reverse', description='Order of configuration items (Reverse or Forward)'
+        ),
+    ) -> Dict[str, Any]:
+        """Discover relationships for a specific AWS resource using AWS Config.
+
+        This tool retrieves the configuration history for a specific AWS resource
+        and returns its relationships with other resources. This is useful for
+        understanding resource dependencies, such as finding which subnet an ALB
+        is placed in or which security groups are attached to an instance.
+
+        Args:
+            ctx: The MCP context for logging and communication
+            resource_type: AWS resource type (e.g., AWS::EC2::Instance)
+            resource_id: AWS resource ID to discover relationships for
+            limit: Maximum number of configuration items to retrieve
+            chronological_order: Order of configuration items (Reverse or Forward)
+
+        Returns:
+            Dict containing resource relationships and configuration details
+        """
+        try:
+            # Get resource configuration history
+            params = {
+                'resourceType': resource_type,
+                'resourceId': resource_id,
+                'chronologicalOrder': chronological_order,
+            }
+
+            if limit:
+                params['limit'] = limit
+
+            response = aws_config_client.get_resource_config_history(**params)
+
+            result = {
+                'resource_type': resource_type,
+                'resource_id': resource_id,
+                'relationships': [],
+                'configuration_items': [],
+            }
+
+            # Process configuration items
+            config_items = response.get('configurationItems', [])
+
+            if not config_items:
+                result['message'] = 'No configuration items found for the specified resource'
+                return result
+
+            # Extract relationships from the most recent configuration item
+            latest_config = config_items[0] if config_items else {}
+            relationships = latest_config.get('relationships', [])
+
+            result['relationships'] = relationships
+
+            # Include configuration item details (without sensitive data)
+            for item in config_items:
+                config_summary = {
+                    'configuration_item_capture_time': str(
+                        item.get('configurationItemCaptureTime', '')
+                    ),
+                    'configuration_state_id': item.get('configurationStateId'),
+                    'aws_region': item.get('awsRegion'),
+                    'availability_zone': item.get('availabilityZone'),
+                    'resource_creation_time': str(item.get('resourceCreationTime', '')),
+                    'tags': item.get('tags', {}),
+                    'relationships_count': len(item.get('relationships', [])),
+                }
+                result['configuration_items'].append(config_summary)
+
+            # Add summary statistics
+            result['summary'] = {
+                'total_relationships': len(relationships),
+                'total_configuration_items': len(config_items),
+                'relationship_types': list(
+                    {rel.get('relationshipName', '') for rel in relationships}
+                ),
+            }
+
+            await ctx.info(
+                f'Found {len(relationships)} relationships for {resource_type} {resource_id}'
+            )
+            return result
+
+        except Exception as e:
+            await ctx.error(f'Error discovering resource relationships: {str(e)}')
             raise
 
 

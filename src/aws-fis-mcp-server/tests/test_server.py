@@ -334,12 +334,14 @@ class TestResourceDiscovery:
         """Set up mocks for AWS clients and other dependencies."""
         self.mock_resource_explorer = MagicMock()
         self.mock_cloudformation = MagicMock()
+        self.mock_aws_config_client = MagicMock()
         self.mock_context = AsyncMock()
         self.resource_discovery = ResourceDiscovery()
 
         with (
             patch.object(server_module, 'resource_explorer', self.mock_resource_explorer),
             patch.object(server_module, 'cloudformation', self.mock_cloudformation),
+            patch.object(server_module, 'aws_config_client', self.mock_aws_config_client),
         ):
             yield
 
@@ -781,6 +783,138 @@ class TestResourceDiscovery:
         assert (
             len(result['resources']) == 2
         )  # Should break when hitting max_results during pagination
+
+    @pytest.mark.asyncio
+    async def test_discover_relationships_success(self):
+        """Test discovering resource relationships successfully."""
+        resource_type = 'AWS::EC2::Instance'
+        resource_id = 'i-02151a3c2be355f9e'
+
+        self.mock_aws_config_client.get_resource_config_history.return_value = {
+            'configurationItems': [
+                {
+                    'configurationItemCaptureTime': '2023-01-01T00:00:00.000Z',
+                    'configurationStateId': 'ResourceStateId',
+                    'awsRegion': 'us-east-1',
+                    'availabilityZone': 'us-east-1a',
+                    'resourceCreationTime': '2023-01-01T00:00:00.000Z',
+                    'tags': {'Name': 'TestInstance'},
+                    'relationships': [
+                        {
+                            'resourceType': 'AWS::EC2::Subnet',
+                            'resourceId': 'subnet-12345',
+                            'relationshipName': 'Is contained in Subnet',
+                        },
+                        {
+                            'resourceType': 'AWS::EC2::SecurityGroup',
+                            'resourceId': 'sg-12345',
+                            'relationshipName': 'Is associated with SecurityGroup',
+                        },
+                    ],
+                }
+            ]
+        }
+
+        result = await ResourceDiscovery.discover_relationships.fn(
+            self.mock_context, resource_type=resource_type, resource_id=resource_id
+        )
+
+        assert result['resource_type'] == resource_type
+        assert result['resource_id'] == resource_id
+        assert len(result['relationships']) == 2
+        assert result['relationships'][0]['resourceType'] == 'AWS::EC2::Subnet'
+        assert result['relationships'][1]['resourceType'] == 'AWS::EC2::SecurityGroup'
+        assert result['summary']['total_relationships'] == 2
+        assert len(result['configuration_items']) == 1
+
+        # Verify the method was called once
+        self.mock_aws_config_client.get_resource_config_history.assert_called_once()
+
+        # Verify the call arguments
+        call_args = self.mock_aws_config_client.get_resource_config_history.call_args
+        assert call_args.kwargs['resourceType'] == resource_type
+        assert call_args.kwargs['resourceId'] == resource_id
+
+    @pytest.mark.asyncio
+    async def test_discover_relationships_no_config_items(self):
+        """Test discovering relationships when no configuration items found."""
+        resource_type = 'AWS::EC2::Instance'
+        resource_id = 'i-nonexistent'
+
+        self.mock_aws_config_client.get_resource_config_history.return_value = {
+            'configurationItems': []
+        }
+
+        result = await ResourceDiscovery.discover_relationships.fn(
+            self.mock_context, resource_type=resource_type, resource_id=resource_id
+        )
+
+        assert result['resource_type'] == resource_type
+        assert result['resource_id'] == resource_id
+        assert result['message'] == 'No configuration items found for the specified resource'
+        assert len(result['relationships']) == 0
+        assert len(result['configuration_items']) == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_relationships_with_custom_parameters(self):
+        """Test discovering relationships with custom limit and chronological order."""
+        resource_type = 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+        resource_id = 'arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-alb/1234567890abcdef'
+
+        self.mock_aws_config_client.get_resource_config_history.return_value = {
+            'configurationItems': [
+                {
+                    'configurationItemCaptureTime': '2023-01-01T00:00:00.000Z',
+                    'configurationStateId': 'ResourceStateId',
+                    'awsRegion': 'us-east-1',
+                    'relationships': [
+                        {
+                            'resourceType': 'AWS::EC2::Subnet',
+                            'resourceId': 'subnet-12345',
+                            'relationshipName': 'Is contained in Subnet',
+                        }
+                    ],
+                }
+            ]
+        }
+
+        result = await ResourceDiscovery.discover_relationships.fn(
+            self.mock_context,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            limit=5,
+            chronological_order='Forward',
+        )
+
+        assert result['resource_type'] == resource_type
+        assert result['resource_id'] == resource_id
+        assert len(result['relationships']) == 1
+        assert result['relationships'][0]['resourceType'] == 'AWS::EC2::Subnet'
+
+        self.mock_aws_config_client.get_resource_config_history.assert_called_once_with(
+            resourceType=resource_type,
+            resourceId=resource_id,
+            chronologicalOrder='Forward',
+            limit=5,
+        )
+
+    @pytest.mark.asyncio
+    async def test_discover_relationships_error(self):
+        """Test error handling when discovering resource relationships."""
+        resource_type = 'AWS::EC2::Instance'
+        resource_id = 'i-12345'
+
+        self.mock_aws_config_client.get_resource_config_history.side_effect = ClientError(
+            {'Error': {'Code': 'AccessDenied', 'Message': 'Access denied'}},
+            'get_resource_config_history',
+        )
+
+        with pytest.raises(ClientError):
+            await ResourceDiscovery.discover_relationships.fn(
+                self.mock_context, resource_type=resource_type, resource_id=resource_id
+            )
+
+        self.mock_context.error.assert_called_once()
 
 
 class TestExperimentTemplates:
