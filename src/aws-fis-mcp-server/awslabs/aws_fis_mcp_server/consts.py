@@ -41,6 +41,7 @@ SERVICE_FIS = 'fis'
 SERVICE_S3 = 's3'
 SERVICE_RESOURCE_EXPLORER = 'resource-explorer-2'
 SERVICE_CLOUDFORMATION = 'cloudformation'
+SERVICE_CONFIG = 'config'
 
 # AWS config settings
 AWS_CONFIG_SIGNATURE_VERSION = 'v4'

@@ -29,6 +29,7 @@ from awslabs.aws_fis_mcp_server.consts import (
     ENV_AWS_REGION,
     ENV_FASTMCP_LOG_LEVEL,
     SERVICE_CLOUDFORMATION,
+    SERVICE_CONFIG,
     SERVICE_FIS,
     SERVICE_RESOURCE_EXPLORER,
     SERVICE_S3,
@@ -68,7 +69,7 @@ try:
     s3 = session.client(SERVICE_S3, config=aws_config)
     resource_explorer = session.client(SERVICE_RESOURCE_EXPLORER, config=aws_config)
     cloudformation = session.client(SERVICE_CLOUDFORMATION, config=aws_config)
-    aws_config_client = session.client('config', config=aws_config)
+    aws_config_client = session.client(SERVICE_CONFIG, config=aws_config)
 
     logger.info(f'AWS clients initialized successfully in region {AWS_REGION}')
 
