@@ -30,7 +30,10 @@ class TestAwsFisActions:
         self.mock_aws_fis = MagicMock()
         self.mock_context = AsyncMock()
 
-        with patch.object(server_module, 'aws_fis', self.mock_aws_fis):
+        with (
+            patch.object(server_module, 'aws_fis', self.mock_aws_fis),
+            patch.object(server_module, 'allow_writes', True),
+        ):
             yield
 
     @pytest.mark.asyncio
@@ -319,6 +322,7 @@ class TestResourceDiscovery:
             patch.object(server_module, 'resource_explorer', self.mock_resource_explorer),
             patch.object(server_module, 'cloudformation', self.mock_cloudformation),
             patch.object(server_module, 'aws_config_client', self.mock_aws_config_client),
+            patch.object(server_module, 'allow_writes', True),
         ):
             yield
 
@@ -909,7 +913,10 @@ class TestExperimentTemplates:
         self.mock_aws_fis = MagicMock()
         self.mock_context = AsyncMock()
 
-        with patch.object(server_module, 'aws_fis', self.mock_aws_fis):
+        with (
+            patch.object(server_module, 'aws_fis', self.mock_aws_fis),
+            patch.object(server_module, 'allow_writes', True),
+        ):
             yield
 
     @pytest.mark.asyncio

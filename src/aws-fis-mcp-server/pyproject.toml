@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "argparse>=1.4.0",
     "asyncio>=3.4.3",
     "aws-cdk-lib>=2.200.1",
     "boto3>=1.38.32",

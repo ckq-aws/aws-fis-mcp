@@ -29,18 +29,22 @@ def mock_aws_clients():
     mock_s3 = MagicMock()
     mock_resource_explorer = MagicMock()
     mock_cloudformation = MagicMock()
+    mock_aws_config_client = MagicMock()
 
     with (
         patch.object(server_module, 'aws_fis', mock_aws_fis),
         patch.object(server_module, 's3', mock_s3),
         patch.object(server_module, 'resource_explorer', mock_resource_explorer),
         patch.object(server_module, 'cloudformation', mock_cloudformation),
+        patch.object(server_module, 'aws_config_client', mock_aws_config_client),
+        patch.object(server_module, 'allow_writes', True),  # Enable writes for testing
     ):
         yield {
             'aws_fis': mock_aws_fis,
             's3': mock_s3,
             'resource_explorer': mock_resource_explorer,
             'cloudformation': mock_cloudformation,
+            'aws_config_client': mock_aws_config_client,
         }
 
 
