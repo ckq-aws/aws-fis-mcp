@@ -536,7 +536,8 @@ class ResourceDiscovery:
         ctx: Context,
         query: str = Field(..., description='Filter string for the view'),
         view_name: str = Field(..., description='Name of the view'),
-        tags: Optional[Dict[str, str]] = Field(None, description='Tags to apply to the view'),
+        name: str = Field(..., description='Required name for the view (will be added as Name tag)'),
+        tags: Optional[Dict[str, str]] = Field(None, description='Optional additional tags to apply to the view'),
         scope: Optional[str] = Field(None, description='Scope of the view'),
         client_token: Optional[str] = Field(None, description='Client token for idempotency'),
     ) -> Dict[str, Any]:
@@ -557,8 +558,12 @@ class ResourceDiscovery:
             Dict containing the created view details
         """
         try:
-            # Default empty dict for tags
-            tags = tags or {}
+            # Start with Name tag as required
+            view_tags = {'Name': name}
+            
+            # Add any additional tags if provided
+            if tags:
+                view_tags.update(tags)
 
             # Generate client token if not provided
             if not client_token:
@@ -568,10 +573,11 @@ class ResourceDiscovery:
                 ClientToken=client_token,
                 Filters={'FilterString': query},
                 Scope=scope,
-                Tags=tags,
+                Tags=view_tags,
                 ViewName=view_name,
             )
 
+            await ctx.info(f'Created Resource Explorer view "{name}" with name: {view_name}')
             return response
         except Exception as e:
             await ctx.error(f'Error creating Resource Explorer view: {str(e)}')
@@ -697,8 +703,9 @@ class ExperimentTemplates:
         clientToken: str = Field(..., description='Client token for idempotency'),
         description: str = Field(..., description='Description of the experiment template'),
         role_arn: str = Field(..., description='IAM role ARN for experiment execution'),
+        name: str = Field(..., description='Required name for the experiment template (will be added as Name tag)'),
         tags: Optional[Dict[str, str]] = Field(
-            None, description='Optional tags to apply to the template'
+            None, description='Optional additional tags to apply to the template'
         ),
         stop_conditions: Optional[List[Dict[str, str]]] = Field(
             None, description='Conditions that stop the experiment'
@@ -741,8 +748,14 @@ class ExperimentTemplates:
             Dict containing the created experiment template
         """
         try:
+            # Start with Name tag as required
+            template_tags = {'Name': name}
+            
+            # Add any additional tags if provided
+            if tags:
+                template_tags.update(tags)
+
             # Default empty collections
-            tags = tags or {}
             stop_conditions = stop_conditions or []
             targets = targets or {}
             actions = actions or {}
@@ -754,12 +767,13 @@ class ExperimentTemplates:
                 targets=targets,
                 actions=actions,
                 roleArn=role_arn,
-                tags=tags,
+                tags=template_tags,
                 logConfiguration=log_configuration,
                 experimentOptions=experiment_options,
                 experimentReportConfiguration=report_configuration,
             )
 
+            await ctx.info(f'Created experiment template "{name}" with ID: {response.get("experimentTemplate", {}).get("id", "unknown")}')
             return response
         except Exception as e:
             await ctx.error(f'Error creating experiment template: {str(e)}')
