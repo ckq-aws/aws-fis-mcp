@@ -29,7 +29,6 @@ class TestAwsFisActions:
         """Set up mocks for AWS clients and other dependencies."""
         self.mock_aws_fis = MagicMock()
         self.mock_context = AsyncMock()
-        self.fis_actions = AwsFisActions()
 
         with patch.object(server_module, 'aws_fis', self.mock_aws_fis):
             yield
@@ -50,7 +49,7 @@ class TestAwsFisActions:
             ]
         }
 
-        result = await self.fis_actions.list_all_fis_experiments.fn(self.mock_context)
+        result = await AwsFisActions.list_all_fis_experiments(self.mock_context)
 
         assert len(result) == 1
         assert 'Test Experiment' in result
@@ -87,7 +86,7 @@ class TestAwsFisActions:
             },
         ]
 
-        result = await self.fis_actions.list_all_fis_experiments.fn(self.mock_context)
+        result = await AwsFisActions.list_all_fis_experiments(self.mock_context)
 
         assert len(result) == 2
         assert 'Test Experiment 1' in result
@@ -102,7 +101,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await self.fis_actions.list_all_fis_experiments.fn(self.mock_context)
+            await AwsFisActions.list_all_fis_experiments(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -119,9 +118,7 @@ class TestAwsFisActions:
             }
         }
 
-        result = await self.fis_actions.get_experiment_details.fn(
-            self.mock_context, id=experiment_id
-        )
+        result = await AwsFisActions.get_experiment_details(self.mock_context, id=experiment_id)
 
         assert result['id'] == experiment_id
         assert result['state']['status'] == 'completed'
@@ -137,7 +134,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await self.fis_actions.get_experiment_details.fn(self.mock_context, id=experiment_id)
+            await AwsFisActions.get_experiment_details(self.mock_context, id=experiment_id)
 
         self.mock_context.error.assert_called_once()
 
@@ -154,7 +151,7 @@ class TestAwsFisActions:
             ]
         }
 
-        result = await self.fis_actions.list_experiment_templates.fn(self.mock_context)
+        result = await AwsFisActions.list_experiment_templates(self.mock_context)
 
         assert len(result) == 1
         assert result[0]['id'] == 'template-1'
@@ -174,9 +171,7 @@ class TestAwsFisActions:
             }
         }
 
-        result = await self.fis_actions.get_experiment_template.fn(
-            self.mock_context, id=template_id
-        )
+        result = await AwsFisActions.get_experiment_template(self.mock_context, id=template_id)
 
         assert 'experimentTemplate' in result
         assert result['experimentTemplate']['id'] == template_id
@@ -203,20 +198,20 @@ class TestAwsFisActions:
         ]
 
         with patch('asyncio.sleep', new_callable=AsyncMock):
-            result = await self.fis_actions.start_experiment.fn(
+            result = await AwsFisActions.start_experiment(
                 self.mock_context,
-                id=template_id,
-                tags=tags,
-                max_timeout_seconds=10,
+                template_id,
+                'Test Experiment',
+                tags,
             )
 
-        assert result['id'] == experiment_id
-        assert result['state']['status'] == 'completed'
+        assert result['experiment_id'] == experiment_id
+        assert result['status'] == 'started'
         self.mock_aws_fis.start_experiment.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_start_experiment_timeout(self):
-        """Test starting an experiment that times out."""
+    async def test_start_experiment_immediate_return(self):
+        """Test starting an experiment returns immediately."""
         template_id = 'template-1'
         experiment_id = 'exp-1'
 
@@ -224,24 +219,20 @@ class TestAwsFisActions:
             'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
         }
 
-        self.mock_aws_fis.get_experiment.return_value = {
-            'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
-        }
+        result = await AwsFisActions.start_experiment(
+            self.mock_context,
+            template_id,
+            'Test Experiment',
+            None,
+        )
 
-        with patch('asyncio.sleep', new_callable=AsyncMock), patch('time.time') as mock_time:
-            mock_time.side_effect = [0, 0, 11]  # Simulate timeout
-
-            with pytest.raises(TimeoutError):
-                await self.fis_actions.start_experiment.fn(
-                    self.mock_context,
-                    id=template_id,
-                    max_timeout_seconds=10,
-                    initial_poll_interval=1,
-                )
+        assert result['experiment_id'] == experiment_id
+        assert result['status'] == 'started'
+        assert result['name'] == 'Test Experiment'
 
     @pytest.mark.asyncio
-    async def test_start_experiment_stopped_state(self):
-        """Test starting an experiment that gets stopped."""
+    async def test_start_experiment_basic_success(self):
+        """Test starting an experiment successfully."""
         template_id = 'template-1'
         experiment_id = 'exp-1'
 
@@ -249,36 +240,23 @@ class TestAwsFisActions:
             'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
         }
 
-        self.mock_aws_fis.get_experiment.return_value = {
-            'experiment': {
-                'id': experiment_id,
-                'state': {'status': 'stopped'},
-            }
-        }
+        result = await AwsFisActions.start_experiment(
+            self.mock_context, template_id, 'Test Experiment', None
+        )
+        assert result['status'] == 'started'
+        assert result['experiment_id'] == experiment_id
 
-        with patch('asyncio.sleep', new_callable=AsyncMock):
-            result = await self.fis_actions.start_experiment.fn(
-                self.mock_context, id=template_id, max_timeout_seconds=10
+    @pytest.mark.asyncio
+    async def test_start_experiment_error(self):
+        """Test starting an experiment with AWS error."""
+        template_id = 'template-1'
+
+        self.mock_aws_fis.start_experiment.side_effect = Exception('Template not found')
+
+        with pytest.raises(Exception, match='Template not found'):
+            await AwsFisActions.start_experiment(
+                self.mock_context, template_id, 'Test Experiment', None
             )
-            assert result['state']['status'] == 'stopped'
-
-    @pytest.mark.asyncio
-    async def test_start_experiment_not_found_error(self):
-        """Test starting an experiment with 'experiment not found' error."""
-        template_id = 'template-1'
-        experiment_id = 'exp-1'
-
-        self.mock_aws_fis.start_experiment.return_value = {
-            'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
-        }
-
-        self.mock_aws_fis.get_experiment.side_effect = Exception('Experiment not found')
-
-        with patch('asyncio.sleep', new_callable=AsyncMock):
-            with pytest.raises(Exception, match='Experiment not found'):
-                await self.fis_actions.start_experiment.fn(
-                    self.mock_context, id=template_id, max_timeout_seconds=10
-                )
 
     @pytest.mark.asyncio
     async def test_list_experiment_templates_with_pagination(self):
@@ -291,7 +269,7 @@ class TestAwsFisActions:
             {'experimentTemplates': [{'id': 'template-2', 'description': 'Template 2'}]},
         ]
 
-        result = await self.fis_actions.list_experiment_templates.fn(self.mock_context)
+        result = await AwsFisActions.list_experiment_templates(self.mock_context)
 
         assert len(result) == 2
         assert result[0]['id'] == 'template-1'
@@ -307,7 +285,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await self.fis_actions.list_experiment_templates.fn(self.mock_context)
+            await AwsFisActions.list_experiment_templates(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -321,7 +299,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await self.fis_actions.get_experiment_template.fn(self.mock_context, id=template_id)
+            await AwsFisActions.get_experiment_template(self.mock_context, id=template_id)
 
         self.mock_context.error.assert_called_once()
 
@@ -336,7 +314,6 @@ class TestResourceDiscovery:
         self.mock_cloudformation = MagicMock()
         self.mock_aws_config_client = MagicMock()
         self.mock_context = AsyncMock()
-        self.resource_discovery = ResourceDiscovery()
 
         with (
             patch.object(server_module, 'resource_explorer', self.mock_resource_explorer),
@@ -358,7 +335,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await self.resource_discovery.list_cfn_stacks(self.mock_context)
+        result = await ResourceDiscovery.list_cfn_stacks(self.mock_context)
 
         assert 'stacks' in result
         assert len(result['stacks']) == 1
@@ -380,7 +357,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await self.resource_discovery.get_stack_resources(
+        result = await ResourceDiscovery.get_stack_resources(
             self.mock_context, stack_name=stack_name
         )
 
@@ -402,7 +379,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await self.resource_discovery.list_views(self.mock_context)
+        result = await ResourceDiscovery.list_views(self.mock_context)
 
         assert len(result) == 1
         assert result[0]['ViewName'] == 'test-view'
@@ -424,11 +401,12 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            result = await self.resource_discovery.create_view.fn(
+            result = await ResourceDiscovery.create_view(
                 self.mock_context,
-                query=query,
-                view_name=view_name,
-                tags=tags,
+                query,
+                view_name,
+                'Test View',
+                tags,
             )
 
         assert 'View' in result
@@ -450,7 +428,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await self.resource_discovery.discover_resources.fn(
+        result = await ResourceDiscovery.discover_resources(
             self.mock_context, source='resource-explorer', query=query
         )
 
@@ -463,7 +441,7 @@ class TestResourceDiscovery:
     async def test_discover_resources_cloudformation_missing_stack_name(self):
         """Test error when CloudFormation source is specified without stack name."""
         with pytest.raises(ValueError, match='stack_name is required'):
-            await self.resource_discovery.discover_resources.fn(
+            await ResourceDiscovery.discover_resources(
                 self.mock_context,
                 source='cloudformation',
                 stack_name=None,
@@ -475,7 +453,7 @@ class TestResourceDiscovery:
         # Mock Resource Explorer search to fail
         self.mock_resource_explorer.search.side_effect = Exception('Access denied')
 
-        result = await self.resource_discovery.discover_resources.fn(
+        result = await ResourceDiscovery.discover_resources(
             self.mock_context, source='resource-explorer'
         )
 
@@ -508,10 +486,12 @@ class TestResourceDiscovery:
         ) as mock_get_stack:
             mock_get_stack.return_value = mock_resources
 
-            result = await self.resource_discovery.discover_resources.fn(
+            result = await ResourceDiscovery.discover_resources(
                 self.mock_context,
-                source='cloudformation',
-                stack_name=stack_name,
+                'cloudformation',
+                stack_name,
+                None,
+                100,
             )
 
             # Should have resources from the stack
@@ -531,7 +511,7 @@ class TestResourceDiscovery:
             {'StackSummaries': [{'StackName': 'stack-2', 'StackStatus': 'UPDATE_COMPLETE'}]},
         ]
 
-        result = await self.resource_discovery.list_cfn_stacks(self.mock_context)
+        result = await ResourceDiscovery.list_cfn_stacks(self.mock_context)
 
         assert 'stacks' in result
         assert len(result['stacks']) == 2
@@ -548,7 +528,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await self.resource_discovery.list_cfn_stacks(self.mock_context)
+            await ResourceDiscovery.list_cfn_stacks(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -578,7 +558,7 @@ class TestResourceDiscovery:
             },
         ]
 
-        result = await self.resource_discovery.get_stack_resources(
+        result = await ResourceDiscovery.get_stack_resources(
             self.mock_context, stack_name=stack_name
         )
 
@@ -598,9 +578,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await self.resource_discovery.get_stack_resources(
-                self.mock_context, stack_name=stack_name
-            )
+            await ResourceDiscovery.get_stack_resources(self.mock_context, stack_name=stack_name)
 
         self.mock_context.error.assert_called_once()
 
@@ -615,7 +593,7 @@ class TestResourceDiscovery:
             {'Views': [{'ViewName': 'view-2', 'Filters': {'FilterString': 'service:s3'}}]},
         ]
 
-        result = await self.resource_discovery.list_views(self.mock_context)
+        result = await ResourceDiscovery.list_views(self.mock_context)
 
         assert len(result) == 2
         assert result[0]['ViewName'] == 'view-1'
@@ -631,7 +609,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await self.resource_discovery.list_views(self.mock_context)
+            await ResourceDiscovery.list_views(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -649,8 +627,8 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            result = await self.resource_discovery.create_view.fn(
-                self.mock_context, query=query, view_name=view_name
+            result = await ResourceDiscovery.create_view(
+                self.mock_context, query, view_name, 'Test View', None
             )
 
         assert 'View' in result
@@ -671,11 +649,14 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            await self.resource_discovery.create_view.fn(
+            await ResourceDiscovery.create_view(
                 self.mock_context,
-                query=query,
-                view_name=view_name,
-                client_token=None,
+                query,
+                view_name,
+                'Test View',
+                None,
+                None,
+                None,
             )
 
         # Verify the generated client token was used
@@ -692,10 +673,12 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await self.resource_discovery.create_view.fn(
+            await ResourceDiscovery.create_view(
                 self.mock_context,
-                query='service:ec2',
-                view_name='invalid-view',
+                'service:ec2',
+                'invalid-view',
+                'Test View',
+                None,
             )
 
         self.mock_context.error.assert_called_once()
@@ -726,7 +709,7 @@ class TestResourceDiscovery:
             },
         ]
 
-        result = await self.resource_discovery.discover_resources.fn(
+        result = await ResourceDiscovery.discover_resources(
             self.mock_context,
             source='resource-explorer',
             query=query,
@@ -772,7 +755,7 @@ class TestResourceDiscovery:
             },
         ]
 
-        result = await self.resource_discovery.discover_resources.fn(
+        result = await ResourceDiscovery.discover_resources(
             self.mock_context,
             source='resource-explorer',
             query=query,
@@ -815,7 +798,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await ResourceDiscovery.discover_relationships.fn(
+        result = await ResourceDiscovery.discover_relationships(
             self.mock_context, resource_type=resource_type, resource_id=resource_id
         )
 
@@ -845,7 +828,7 @@ class TestResourceDiscovery:
             'configurationItems': []
         }
 
-        result = await ResourceDiscovery.discover_relationships.fn(
+        result = await ResourceDiscovery.discover_relationships(
             self.mock_context, resource_type=resource_type, resource_id=resource_id
         )
 
@@ -878,7 +861,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await ResourceDiscovery.discover_relationships.fn(
+        result = await ResourceDiscovery.discover_relationships(
             self.mock_context,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -910,7 +893,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await ResourceDiscovery.discover_relationships.fn(
+            await ResourceDiscovery.discover_relationships(
                 self.mock_context, resource_type=resource_type, resource_id=resource_id
             )
 
@@ -925,7 +908,6 @@ class TestExperimentTemplates:
         """Set up mocks for AWS clients and other dependencies."""
         self.mock_aws_fis = MagicMock()
         self.mock_context = AsyncMock()
-        self.experiment_templates = ExperimentTemplates()
 
         with patch.object(server_module, 'aws_fis', self.mock_aws_fis):
             yield
@@ -946,11 +928,13 @@ class TestExperimentTemplates:
         description = 'Test Template'
         role_arn = 'arn:aws:iam::123456789012:role/FisRole'
 
-        result = await self.experiment_templates.create_experiment_template.fn(
+        result = await ExperimentTemplates.create_experiment_template(
             self.mock_context,
-            clientToken=client_token,
-            description=description,
-            role_arn=role_arn,
+            client_token,
+            description,
+            role_arn,
+            'Test Template',
+            None,
         )
 
         assert 'experimentTemplate' in result
@@ -965,18 +949,19 @@ class TestExperimentTemplates:
             'experimentTemplate': {'id': template_id, 'description': 'Test Template'}
         }
 
-        result = await self.experiment_templates.create_experiment_template.fn(
+        result = await ExperimentTemplates.create_experiment_template(
             self.mock_context,
-            clientToken='test-token',
-            description='Test Template',
-            role_arn='arn:aws:iam::123456789012:role/FisRole',
-            tags={'Environment': 'Test'},
-            stop_conditions=[{'source': 'aws:cloudwatch:alarm', 'value': 'test-alarm'}],
-            targets={'Instances': {'resourceType': 'aws:ec2:instance'}},
-            actions={'StopInstances': {'actionId': 'aws:ec2:stop-instances'}},
-            log_configuration={'logSchemaVersion': 1},
-            experiment_options={'actionsMode': 'run-all'},
-            report_configuration={'s3Configuration': {'bucketName': 'test-bucket'}},
+            'test-token',
+            'Test Template',
+            'arn:aws:iam::123456789012:role/FisRole',
+            'Test Template',
+            {'Environment': 'Test'},
+            [{'source': 'aws:cloudwatch:alarm', 'value': 'test-alarm'}],
+            {'Instances': {'resourceType': 'aws:ec2:instance'}},
+            {'StopInstances': {'actionId': 'aws:ec2:stop-instances'}},
+            {'logSchemaVersion': 1},
+            {'actionsMode': 'run-all'},
+            {'s3Configuration': {'bucketName': 'test-bucket'}},
         )
 
         assert 'experimentTemplate' in result
@@ -991,11 +976,13 @@ class TestExperimentTemplates:
         )
 
         with pytest.raises(ClientError):
-            await self.experiment_templates.create_experiment_template.fn(
+            await ExperimentTemplates.create_experiment_template(
                 self.mock_context,
-                clientToken='test-token',
-                description='Test Template',
-                role_arn='invalid-arn',
+                'test-token',
+                'Test Template',
+                'invalid-arn',
+                'Test Template',
+                None,
             )
 
         self.mock_context.error.assert_called_once()
@@ -1008,7 +995,7 @@ class TestExperimentTemplates:
             'experimentTemplate': {'id': template_id, 'description': 'Updated Template'}
         }
 
-        result = await self.experiment_templates.update_experiment_template.fn(
+        result = await ExperimentTemplates.update_experiment_template(
             self.mock_context,
             id=template_id,
             description='Updated Template',
@@ -1027,7 +1014,7 @@ class TestExperimentTemplates:
             'experimentTemplate': {'id': template_id}
         }
 
-        result = await self.experiment_templates.update_experiment_template.fn(
+        result = await ExperimentTemplates.update_experiment_template(
             self.mock_context,
             id=template_id,
             description='Updated Description',
@@ -1053,7 +1040,7 @@ class TestExperimentTemplates:
         )
 
         with pytest.raises(ClientError):
-            await self.experiment_templates.update_experiment_template.fn(
+            await ExperimentTemplates.update_experiment_template(
                 self.mock_context,
                 id=template_id,
                 description='Updated Template',

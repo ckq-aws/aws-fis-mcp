@@ -14,7 +14,6 @@
 
 """AWS FIS MCP Server implementation."""
 
-import asyncio
 import boto3
 import os
 import sys
@@ -36,8 +35,8 @@ from awslabs.aws_fis_mcp_server.consts import (
 )
 from botocore.config import Config
 from dotenv import load_dotenv
-from mcp.server.fastmcp import Context, FastMCP
 from loguru import logger
+from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 from typing import Any, Dict, List, Optional
 
@@ -228,14 +227,16 @@ class AwsFisActions:
     async def start_experiment(
         ctx: Context,
         id: str = Field(..., description='The experiment template ID to execute'),
-        name: str = Field(..., description='Required name for the experiment (will be added as Name tag)'),
+        name: str = Field(
+            ..., description='Required name for the experiment (will be added as Name tag)'
+        ),
         tags: Optional[Dict[str, str]] = Field(
             None, description='Optional additional tags to apply to the experiment'
         ),
         action: Optional[str] = Field(
             'run-all',
             description='The actions mode for experiment execution (run-all, skip-all, or stop-on-failure)',
-        )
+        ),
     ) -> Dict[str, Any]:
         """Starts an AWS FIS experiment and returns immediately after starting.
 
@@ -255,15 +256,15 @@ class AwsFisActions:
         try:
             # Start with Name tag as required
             experiment_tags = {'Name': name}
-            
+
             # Add any additional tags if provided
             if tags:
                 experiment_tags.update(tags)
 
             response = aws_fis.start_experiment(
-                experimentTemplateId=id, 
-                experimentOptions={'actionsMode': action}, 
-                tags=experiment_tags
+                experimentTemplateId=id,
+                experimentOptions={'actionsMode': action},
+                tags=experiment_tags,
             )
 
             experiment_id = response['experiment']['id']
@@ -275,7 +276,7 @@ class AwsFisActions:
                 'status': 'started',
                 'template_id': id,
                 'tags': experiment_tags,
-                'message': f'Experiment "{name}" started successfully. Use get_experiment tool to check status.'
+                'message': f'Experiment "{name}" started successfully. Use get_experiment tool to check status.',
             }
 
         except Exception as e:
@@ -343,7 +344,7 @@ class ResourceDiscovery:
 
                 if stack_name:
                     # Get resources from specific stack
-                    cfn_resources = ResourceDiscovery.get_stack_resources(ctx, stack_name)
+                    cfn_resources = await ResourceDiscovery.get_stack_resources(ctx, stack_name)
                     for resource in cfn_resources.get('resources', []):
                         result['resources'].append(
                             {
@@ -357,7 +358,7 @@ class ResourceDiscovery:
                         )
                 elif source.lower() == 'all':
                     # List all stacks and get their resources
-                    stacks_response = ResourceDiscovery.list_cfn_stacks(ctx)
+                    stacks_response = await ResourceDiscovery.list_cfn_stacks(ctx)
                     stacks = stacks_response.get('stacks', [])
 
                     # Limit the number of stacks to process to avoid timeouts
@@ -366,7 +367,7 @@ class ResourceDiscovery:
                         if not stack_name:
                             continue
                         try:
-                            stack_resources = ResourceDiscovery.get_stack_resources(
+                            stack_resources = await ResourceDiscovery.get_stack_resources(
                                 ctx, stack_name
                             )
                             for resource in stack_resources.get('resources', [])[
@@ -456,12 +457,12 @@ class ResourceDiscovery:
         try:
             all_stacks = []
             cfn = cloudformation
-            response = cfn.list_stacks()  
+            response = cfn.list_stacks()
             all_stacks.extend(response.get('StackSummaries', []))
 
             # Handle pagination
             while 'NextToken' in response:
-                response = cfn.list_stacks(NextToken=response['NextToken'])  
+                response = cfn.list_stacks(NextToken=response['NextToken'])
                 all_stacks.extend(response.get('StackSummaries', []))
 
             return {'stacks': all_stacks}
@@ -491,12 +492,12 @@ class ResourceDiscovery:
         try:
             all_resources = []
             cfn = cloudformation
-            response = cfn.list_stack_resources(StackName=stack_name)  
+            response = cfn.list_stack_resources(StackName=stack_name)
             all_resources.extend(response.get('StackResourceSummaries', []))
 
             # Handle pagination
             while 'NextToken' in response:
-                response = cfn.list_stack_resources(  
+                response = cfn.list_stack_resources(
                     StackName=stack_name, NextToken=response['NextToken']
                 )
                 all_resources.extend(response.get('StackResourceSummaries', []))
@@ -536,8 +537,12 @@ class ResourceDiscovery:
         ctx: Context,
         query: str = Field(..., description='Filter string for the view'),
         view_name: str = Field(..., description='Name of the view'),
-        name: str = Field(..., description='Required name for the view (will be added as Name tag)'),
-        tags: Optional[Dict[str, str]] = Field(None, description='Optional additional tags to apply to the view'),
+        name: str = Field(
+            ..., description='Required name for the view (will be added as Name tag)'
+        ),
+        tags: Optional[Dict[str, str]] = Field(
+            None, description='Optional additional tags to apply to the view'
+        ),
         scope: Optional[str] = Field(None, description='Scope of the view'),
         client_token: Optional[str] = Field(None, description='Client token for idempotency'),
     ) -> Dict[str, Any]:
@@ -550,7 +555,8 @@ class ResourceDiscovery:
             ctx: The MCP context for logging and communication
             query: Filter string for the view
             view_name: Name of the view
-            tags: Tags to apply to the view
+            name: Required name for the view (will be added as Name tag)
+            tags: Optional additional tags to apply to the view
             scope: Scope of the view
             client_token: Client token for idempotency
 
@@ -560,7 +566,7 @@ class ResourceDiscovery:
         try:
             # Start with Name tag as required
             view_tags = {'Name': name}
-            
+
             # Add any additional tags if provided
             if tags:
                 view_tags.update(tags)
@@ -703,7 +709,10 @@ class ExperimentTemplates:
         clientToken: str = Field(..., description='Client token for idempotency'),
         description: str = Field(..., description='Description of the experiment template'),
         role_arn: str = Field(..., description='IAM role ARN for experiment execution'),
-        name: str = Field(..., description='Required name for the experiment template (will be added as Name tag)'),
+        name: str = Field(
+            ...,
+            description='Required name for the experiment template (will be added as Name tag)',
+        ),
         tags: Optional[Dict[str, str]] = Field(
             None, description='Optional additional tags to apply to the template'
         ),
@@ -735,11 +744,12 @@ class ExperimentTemplates:
             ctx: The MCP context for logging and communication
             clientToken: Client token for idempotency
             description: Description of the experiment template
-            tags: Optional tags to apply to the template
+            role_arn: IAM role ARN for experiment execution
+            name: Required name for the experiment template (will be added as Name tag)
+            tags: Optional additional tags to apply to the template
             stop_conditions: Conditions that stop the experiment
             targets: Target resources for the experiment
             actions: Actions to perform during the experiment
-            role_arn: IAM role ARN for experiment execution
             log_configuration: Configuration for experiment logging
             experiment_options: Additional experiment options
             report_configuration: Configuration for experiment reporting
@@ -750,7 +760,7 @@ class ExperimentTemplates:
         try:
             # Start with Name tag as required
             template_tags = {'Name': name}
-            
+
             # Add any additional tags if provided
             if tags:
                 template_tags.update(tags)
@@ -773,7 +783,9 @@ class ExperimentTemplates:
                 experimentReportConfiguration=report_configuration,
             )
 
-            await ctx.info(f'Created experiment template "{name}" with ID: {response.get("experimentTemplate", {}).get("id", "unknown")}')
+            await ctx.info(
+                f'Created experiment template "{name}" with ID: {response.get("experimentTemplate", {}).get("id", "unknown")}'
+            )
             return response
         except Exception as e:
             await ctx.error(f'Error creating experiment template: {str(e)}')
