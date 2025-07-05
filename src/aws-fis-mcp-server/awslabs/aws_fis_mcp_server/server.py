@@ -36,7 +36,7 @@ from awslabs.aws_fis_mcp_server.consts import (
 )
 from botocore.config import Config
 from dotenv import load_dotenv
-from fastmcp import Context, FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from loguru import logger
 from pydantic import Field
 from typing import Any, Dict, List, Optional
@@ -399,7 +399,7 @@ class ResourceDiscovery:
 
                 if stack_name:
                     # Get resources from specific stack
-                    cfn_resources = await ResourceDiscovery.get_stack_resources(ctx, stack_name)
+                    cfn_resources = ResourceDiscovery.get_stack_resources(ctx, stack_name)
                     for resource in cfn_resources.get('resources', []):
                         result['resources'].append(
                             {
@@ -413,7 +413,7 @@ class ResourceDiscovery:
                         )
                 elif source.lower() == 'all':
                     # List all stacks and get their resources
-                    stacks_response = await ResourceDiscovery.list_cfn_stacks(ctx)
+                    stacks_response = ResourceDiscovery.list_cfn_stacks(ctx)
                     stacks = stacks_response.get('stacks', [])
 
                     # Limit the number of stacks to process to avoid timeouts
@@ -422,7 +422,7 @@ class ResourceDiscovery:
                         if not stack_name:
                             continue
                         try:
-                            stack_resources = await ResourceDiscovery.get_stack_resources(
+                            stack_resources = ResourceDiscovery.get_stack_resources(
                                 ctx, stack_name
                             )
                             for resource in stack_resources.get('resources', [])[
@@ -513,12 +513,12 @@ class ResourceDiscovery:
         try:
             all_stacks = []
             cfn = cloudformation
-            response = cfn.list_stacks()  # Remove await here
+            response = cfn.list_stacks()  
             all_stacks.extend(response.get('StackSummaries', []))
 
             # Handle pagination
             while 'NextToken' in response:
-                response = cfn.list_stacks(NextToken=response['NextToken'])  # Remove await here
+                response = cfn.list_stacks(NextToken=response['NextToken'])  
                 all_stacks.extend(response.get('StackSummaries', []))
 
             return {'stacks': all_stacks}
@@ -549,12 +549,12 @@ class ResourceDiscovery:
         try:
             all_resources = []
             cfn = cloudformation
-            response = cfn.list_stack_resources(StackName=stack_name)  # Remove await here
+            response = cfn.list_stack_resources(StackName=stack_name)  
             all_resources.extend(response.get('StackResourceSummaries', []))
 
             # Handle pagination
             while 'NextToken' in response:
-                response = cfn.list_stack_resources(  # Remove await here
+                response = cfn.list_stack_resources(  
                     StackName=stack_name, NextToken=response['NextToken']
                 )
                 all_resources.extend(response.get('StackResourceSummaries', []))
@@ -911,12 +911,6 @@ class ExperimentTemplates:
         except Exception as e:
             await ctx.error(f'Error updating experiment template: {str(e)}')
             raise
-
-
-# Initialize class instances for MCP tool registration
-aws_fis_actions = AwsFisActions()
-resource_discovery = ResourceDiscovery()
-experiment_templates = ExperimentTemplates()
 
 
 def main():
