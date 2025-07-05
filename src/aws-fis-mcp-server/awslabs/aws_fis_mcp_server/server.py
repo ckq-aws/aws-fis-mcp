@@ -108,7 +108,6 @@ class AwsFisActions:
     """
 
     @mcp.tool(name='list_fis_experiments')
-    @staticmethod
     async def list_all_fis_experiments(ctx: Context) -> Dict[str, Dict[str, Any]]:
         """Retrieves a list of Experiments available in the AWS FIS service.
 
@@ -153,7 +152,6 @@ class AwsFisActions:
             raise
 
     @mcp.tool(name='get_experiment')
-    @staticmethod
     async def get_experiment_details(
         ctx: Context,
         id: str = Field(..., description='The experiment ID to retrieve details for'),
@@ -178,7 +176,6 @@ class AwsFisActions:
             raise
 
     @mcp.tool(name='list_experiment_templates')
-    @staticmethod
     async def list_experiment_templates(ctx: Context) -> List[Dict[str, Any]]:
         """List all experiment templates.
 
@@ -204,7 +201,6 @@ class AwsFisActions:
             raise
 
     @mcp.tool(name='get_experiment_template')
-    @staticmethod
     async def get_experiment_template(
         ctx: Context,
         id: str = Field(..., description='The experiment template ID to retrieve'),
@@ -229,112 +225,61 @@ class AwsFisActions:
             raise
 
     @mcp.tool('start_experiment')
-    @staticmethod
     async def start_experiment(
         ctx: Context,
         id: str = Field(..., description='The experiment template ID to execute'),
+        name: str = Field(..., description='Required name for the experiment (will be added as Name tag)'),
         tags: Optional[Dict[str, str]] = Field(
-            None, description='Optional tags to apply to the experiment'
+            None, description='Optional additional tags to apply to the experiment'
         ),
         action: Optional[str] = Field(
             'run-all',
             description='The actions mode for experiment execution (run-all, skip-all, or stop-on-failure)',
-        ),
-        max_timeout_seconds: int = Field(
-            3600,
-            description='Maximum time in seconds to wait for experiment completion (default: 1 hour)',
-        ),
-        initial_poll_interval: int = Field(
-            5, description='Starting poll interval in seconds for status checks'
-        ),
-        max_poll_interval: int = Field(
-            60, description='Maximum poll interval in seconds for status checks'
-        ),
+        )
     ) -> Dict[str, Any]:
-        """Starts an AWS FIS experiment and polls its status until completion.
+        """Starts an AWS FIS experiment and returns immediately after starting.
 
         Args:
             ctx: The MCP context for logging and communication
             id: The experiment template ID
-            tags: Optional tags to apply to the experiment
+            name: Required name for the experiment
+            tags: Optional additional tags to apply to the experiment
             action: The actions mode (default: 'run-all')
-            max_timeout_seconds: Maximum time to wait for experiment completion
-            initial_poll_interval: Starting poll interval in seconds
-            max_poll_interval: Maximum poll interval in seconds
 
         Returns:
-            Dict containing experiment results
+            Dict containing experiment start response
 
         Raises:
-            TimeoutError: If experiment doesn't complete within timeout
-            Exception: For other AWS API errors
+            Exception: For AWS API errors
         """
         try:
-            # Default to empty dict if tags is None
-            tags = tags or {}
+            # Start with Name tag as required
+            experiment_tags = {'Name': name}
+            
+            # Add any additional tags if provided
+            if tags:
+                experiment_tags.update(tags)
 
             response = aws_fis.start_experiment(
-                experimentTemplateId=id, experimentOptions={'actionsMode': action}, tags=tags
+                experimentTemplateId=id, 
+                experimentOptions={'actionsMode': action}, 
+                tags=experiment_tags
             )
 
             experiment_id = response['experiment']['id']
-            await ctx.info(f'Started experiment with ID: {experiment_id}')
+            await ctx.info(f'Started experiment "{name}" with ID: {experiment_id}')
 
-            # Track polling with exponential backoff
-            start_time = time.time()
-            poll_interval = initial_poll_interval
-
-            # Poll experiment status until it's no longer in progress
-            while True:
-                # Check if we've exceeded timeout
-                if time.time() - start_time > max_timeout_seconds:
-                    await ctx.error(
-                        f'Experiment polling timed out after {max_timeout_seconds} seconds'
-                    )
-                    raise TimeoutError(f'Experiment {experiment_id} polling timed out')
-
-                try:
-                    status_response = aws_fis.get_experiment(id=experiment_id)
-                    state = status_response['experiment']['state']['status']
-
-                    if state in ['pending', 'initiating', 'running']:
-                        await ctx.info(f'Experiment is still active. Current Status: {state}')
-                        # Use asyncio.sleep instead of time.sleep to avoid blocking
-                        await asyncio.sleep(poll_interval)
-
-                        # Implement exponential backoff with max limit
-                        poll_interval = min(poll_interval * 1.5, max_poll_interval)
-                    else:
-                        # Handle terminal states
-                        if state == 'completed':
-                            await ctx.info('Experiment completed successfully.')
-                            return status_response['experiment']
-                        elif state == 'stopped':
-                            await ctx.warning('Experiment was stopped.')
-                            return status_response['experiment']
-                        elif state == 'failed':
-                            error_message = (
-                                status_response['experiment']
-                                .get('state', {})
-                                .get('reason', 'Unknown reason')
-                            )
-                            await ctx.error(f'Experiment failed: {error_message}')
-                            raise Exception(f'Experiment failed: {error_message}')
-                        else:
-                            await ctx.error(f'Experiment ended with unknown status: {state}')
-                            raise Exception(f'Unknown experiment status: {state}')
-
-                except Exception as e:
-                    if 'experiment not found' in str(e).lower():
-                        await ctx.error(f'Experiment {experiment_id} not found')
-                        raise
-
-                    # For transient errors, log and continue polling
-                    await ctx.warning(f'Error polling experiment status: {str(e)}. Retrying...')
-                    await asyncio.sleep(poll_interval)
+            return {
+                'experiment_id': experiment_id,
+                'name': name,
+                'status': 'started',
+                'template_id': id,
+                'tags': experiment_tags,
+                'message': f'Experiment "{name}" started successfully. Use get_experiment tool to check status.'
+            }
 
         except Exception as e:
-            await ctx.error(f'Error in start_experiment: {str(e)}')
+            await ctx.error(f'Error starting experiment: {str(e)}')
             raise
 
 
@@ -355,8 +300,7 @@ class ResourceDiscovery:
     provisioned.
     """
 
-    @mcp.tool(name='discover_resources')
-    @staticmethod
+    # @mcp.tool(name='discover_resources')
     async def discover_resources(
         ctx: Context,
         source: str = Field(
@@ -499,8 +443,7 @@ class ResourceDiscovery:
             await ctx.error(f'Resource discovery failed: {str(e)}')
             raise
 
-    # @mcp.tool(name='list_cfn_stacks')
-    @staticmethod
+    @mcp.tool(name='list_cfn_stacks')
     async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
         """Retrieve all AWS CloudFormation Stacks.
 
@@ -526,8 +469,7 @@ class ResourceDiscovery:
             await ctx.error(f'Error listing CloudFormation stacks: {str(e)}')
             raise
 
-    # @mcp.tool(name='get_stack_resources')
-    @staticmethod
+    @mcp.tool(name='get_stack_resources')
     async def get_stack_resources(
         ctx: Context,
         stack_name: str = Field(
@@ -564,8 +506,7 @@ class ResourceDiscovery:
             await ctx.error(f'Error getting stack resources: {str(e)}')
             raise
 
-    # @mcp.tool(name='list_resource_explorer_views')
-    @staticmethod
+    @mcp.tool(name='list_resource_explorer_views')
     async def list_views(ctx: Context) -> List[Dict[str, Any]]:
         """List Resource Explorer views.
 
@@ -591,7 +532,6 @@ class ResourceDiscovery:
             raise
 
     @mcp.tool(name='create_resource_explorer_view')
-    @staticmethod
     async def create_view(
         ctx: Context,
         query: str = Field(..., description='Filter string for the view'),
@@ -638,7 +578,6 @@ class ResourceDiscovery:
             raise
 
     @mcp.tool(name='discover_resource_relationships')
-    @staticmethod
     async def discover_relationships(
         ctx: Context,
         resource_type: str = Field(
@@ -753,7 +692,6 @@ class ExperimentTemplates:
     """
 
     @mcp.tool(name='create_experiment_template')
-    @staticmethod
     async def create_experiment_template(
         ctx: Context,
         clientToken: str = Field(..., description='Client token for idempotency'),
@@ -828,7 +766,6 @@ class ExperimentTemplates:
             raise
 
     @mcp.tool(name='update_experiment_template')
-    @staticmethod
     async def update_experiment_template(
         ctx: Context,
         id: str = Field(..., description='ID of the experiment template to update'),
