@@ -10,24 +10,26 @@ With this integration, AI assistants can help users design resilience testing sc
 
 The server provides the following MCP tools:
 
-### AWS FIS Tools
-- `list_fis_experiments`: Retrieves a list of available FIS experiments
-- `get_experiment`: Gets detailed information about a specific experiment
-- `list_experiment_templates`: Lists all experiment templates
-- `get_experiment_template`: Gets details about a specific template
-- `start_experiment`: Starts an experiment and monitors its status
-- `create_experiment_template`: Creates an FIS experiment template
+### AWS FIS Experiment Management Tools
+- `list_fis_experiments`: Retrieves a list of available FIS experiments organized by name
+- `get_experiment`: Gets detailed information about a specific experiment by ID
+- `list_experiment_templates`: Lists all experiment templates with pagination support
+- `get_experiment_template`: Gets details about a specific experiment template by ID
+- `start_experiment`: Starts an experiment from a template (requires --allow-writes flag)
+
+### AWS FIS Experiment Template Management Tools
+- `create_experiment_template`: Creates a new FIS experiment template (requires --allow-writes flag)
 - `update_experiment_template`: Updates an existing FIS experiment template
 
 ### AWS Resource Discovery Tools
-   ### CloudFormation Tools
-   - `list_cfn_stacks`: Lists all CloudFormation stacks
-   - `get_stack_resources`: Gets resources from a specific stack
+   #### CloudFormation Tools
+   - `list_cfn_stacks`: Lists all CloudFormation stacks with pagination support
+   - `get_stack_resources`: Gets resources from a specific CloudFormation stack
 
-   ### AWS Resource Explorer Tools
-   - `list_resources`: Lists AWS resources
-   - `list_views`: Lists resource explorer views
-   - `create_view`: Creates a new resource view
+   #### AWS Resource Explorer Tools
+   - `list_resource_explorer_views`: Lists all Resource Explorer views
+   - `create_resource_explorer_view`: Creates a new Resource Explorer view (requires --allow-writes flag)
+   - `discover_resource_relationships`: Discovers relationships for a specific AWS resource using AWS Config
 
 ## Requirements
 
@@ -131,21 +133,19 @@ Resources provide the AI with the information it needs to make informed decision
 
 The MCP Inspector is a powerful tool for debugging and troubleshooting your MCP server. It runs locally and acts as a client-side portal to test your MCP server and its functions in real-time without needing to integrate with an actual LLM.
 
-### Installing MCP Inspector
+### Installing & Running MCP Inspector
 
-1. Install Node.js if you haven't already: https://nodejs.org/en/download
-2. This will automatially install npx which is needed to run the mcp inspector. The inspector runs directly through npx without requiring installation.
-3. Run MCP Inspector:
+1. Install Node.js if you haven't already: https://nodejs.org/en/download. This will automatically install npx which is needed to run the mcp inspector. The inspector runs directly through npx without requiring installation.
+2. Change directory: 
+```
+cd src/aws-fis-mcp-server
+```
+3.Run MCP Inspector:
 - **Command to Start MCP Inspector**:
 ```
-npx @modelcontextprotocol/inspector \
-  uv \
-  --directory path/to/server \
-  run \
-  package-name \
-  args...
-  ```
-4. In your terminal copy or click the link to the inspector with the pre-filled token: http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=[PRE-FILLED TOKEN]
+mcp dev server.py
+```
+3. In your terminal copy or click the link to the inspector with the pre-filled token: http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=[PRE-FILLED TOKEN]
 5. Happy debugging!
 
 ### Using MCP Inspector

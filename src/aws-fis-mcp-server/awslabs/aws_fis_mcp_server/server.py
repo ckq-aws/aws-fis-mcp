@@ -116,14 +116,14 @@ mcp = FastMCP(
 )
 
 
-"""Class for AWS FIS experiment actions and operations.
+"""AWS FIS Experiment Management Tools.
 
-This class provides tools for interacting with AWS Fault Injection Simulator (FIS)
-experiments and templates. It enables listing, retrieving, and executing FIS experiments
-through a set of static methods exposed as MCP tools.
+This section provides MCP tools for interacting with AWS Fault Injection Simulator (FIS)
+experiments and templates. These tools enable listing, retrieving, and executing FIS experiments
+to help design and conduct controlled chaos engineering tests.
 
-The class handles AWS API interactions, error handling, and provides structured responses
-suitable for consumption by LLMs. It implements polling mechanisms with exponential backoff
+The tools handle AWS API interactions, error handling, and provide structured responses
+suitable for consumption by LLMs. They implement polling mechanisms with exponential backoff
 for long-running operations and proper pagination handling for list operations.
 """
 
@@ -318,15 +318,15 @@ async def start_experiment(
         raise
 
 
-"""Class for AWS resource discovery operations.
+"""AWS Resource Discovery Tools.
 
-This class provides a unified interface for discovering AWS resources using both
-CloudFormation and Resource Explorer services. It enables the identification of
-potential targets for fault injection experiments across the AWS account.
+This section provides MCP tools for discovering AWS resources using CloudFormation and 
+Resource Explorer services. These tools enable the identification of potential targets 
+for fault injection experiments across the AWS account.
 
-The class offers methods to list resources from different sources, create and manage
-Resource Explorer views, and filter resources based on specific criteria. It handles
-pagination for large result sets and provides structured responses suitable for
+The tools offer methods to list resources from different sources, create and manage
+Resource Explorer views, and filter resources based on specific criteria. They handle
+pagination for large result sets and provide structured responses suitable for
 consumption by LLMs.
 
 This consolidated approach allows for more flexible resource discovery, making it easier
@@ -590,18 +590,18 @@ async def discover_relationships(
         raise
 
 
-"""Class for managing AWS FIS experiment templates.
+"""AWS FIS Experiment Template Management Tools.
 
-This class provides tools for creating and managing AWS Fault Injection Simulator (FIS)
+This section provides MCP tools for creating and managing AWS Fault Injection Simulator (FIS)
 experiment templates. Experiment templates define the parameters for fault injection
 experiments, including targets, actions, and stop conditions.
 
-The class exposes methods as MCP tools that allow for the creation of complex
-experiment templates with full configuration options. It handles the AWS API interactions,
-error handling, and provides structured responses suitable for consumption by LLMs.
+These tools allow for the creation of complex experiment templates with full configuration 
+options. They handle the AWS API interactions, error handling, and provide structured 
+responses suitable for consumption by LLMs.
 
-Experiment templates created through this class can later be used to run
-actual fault injection experiments using the AwsFisActions class.
+Experiment templates created through these tools can later be used to run
+actual fault injection experiments using the FIS experiment management tools.
 """
 
 
