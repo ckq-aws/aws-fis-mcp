@@ -27,6 +27,7 @@ from awslabs.aws_fis_mcp_server.server import (
     list_cfn_stacks,
     list_experiment_templates,
     list_views,
+    search_resources,
     start_experiment,
     update_experiment_template,
 )
@@ -733,6 +734,137 @@ class TestResourceDiscovery:
                 self.mock_context, resource_type=resource_type, resource_id=resource_id
             )
 
+        self.mock_context.error.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_search_resources_success(self):
+        """Test searching resources successfully."""
+        query_string = 'service:ec2 resourcetype:instance'
+        view_arn = 'arn:aws:resource-explorer-2:us-east-1:123456789012:view/test-view'
+        max_results = 50
+
+        # Mock the search response
+        self.mock_resource_explorer.search.return_value = {
+            'Resources': [
+                {
+                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345',
+                    'Properties': [
+                        {'Name': 'resourcetype', 'Value': 'instance'},
+                        {'Name': 'service', 'Value': 'ec2'},
+                    ],
+                    'Region': 'us-east-1',
+                    'Service': 'ec2',
+                },
+                {
+                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-67890',
+                    'Properties': [
+                        {'Name': 'resourcetype', 'Value': 'instance'},
+                        {'Name': 'service', 'Value': 'ec2'},
+                    ],
+                    'Region': 'us-east-1',
+                    'Service': 'ec2',
+                },
+            ],
+            'NextToken': 'next-page-token',
+        }
+
+        # Call the function
+        result = await search_resources(
+            self.mock_context,
+            query_string=query_string,
+            view_arn=view_arn,
+            max_results=max_results,
+        )
+
+        # Verify the results
+        assert len(result['resources']) == 2
+        assert result['next_token'] == 'next-page-token'
+        assert result['query_string'] == query_string
+        assert result['view_arn'] == view_arn
+        assert result['count'] == 2
+
+        # Verify the search was called with correct parameters
+        self.mock_resource_explorer.search.assert_called_once()
+
+        # Verify info was logged
+        self.mock_context.info.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_search_resources_with_pagination(self):
+        """Test searching resources with pagination."""
+        query_string = 'service:ec2'
+        view_arn = 'arn:aws:resource-explorer-2:us-east-1:123456789012:view/test-view'
+        next_token = 'existing-token'
+
+        # Mock the search response
+        self.mock_resource_explorer.search.return_value = {
+            'Resources': [
+                {
+                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-abcdef',
+                    'Properties': [
+                        {'Name': 'resourcetype', 'Value': 'instance'},
+                        {'Name': 'service', 'Value': 'ec2'},
+                    ],
+                    'Region': 'us-east-1',
+                    'Service': 'ec2',
+                }
+            ]
+            # No NextToken in response
+        }
+
+        # Call the function with next_token
+        result = await search_resources(
+            self.mock_context, query_string=query_string, view_arn=view_arn, next_token=next_token
+        )
+
+        # Verify the results
+        assert len(result['resources']) == 1
+        assert 'next_token' not in result  # No more pages
+        assert result['count'] == 1
+
+        # Verify the search was called with next_token
+        self.mock_resource_explorer.search.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_search_resources_empty_results(self):
+        """Test searching resources with no results."""
+        query_string = 'service:nonexistent'
+        view_arn = 'arn:aws:resource-explorer-2:us-east-1:123456789012:view/test-view'
+
+        # Mock empty search response
+        self.mock_resource_explorer.search.return_value = {'Resources': []}
+
+        # Import the search_resources function
+        from awslabs.aws_fis_mcp_server.server import search_resources
+
+        # Call the function
+        result = await search_resources(
+            self.mock_context, query_string=query_string, view_arn=view_arn
+        )
+
+        # Verify the results
+        assert len(result['resources']) == 0
+        assert result['count'] == 0
+
+    @pytest.mark.asyncio
+    async def test_search_resources_error(self):
+        """Test error handling when searching resources."""
+        query_string = 'service:ec2'
+        view_arn = 'arn:aws:resource-explorer-2:us-east-1:123456789012:view/test-view'
+
+        # Mock error response
+        self.mock_resource_explorer.search.side_effect = ClientError(
+            {'Error': {'Code': 'ResourceNotFoundException', 'Message': 'View not found'}}, 'search'
+        )
+
+        # Import the search_resources function
+        from awslabs.aws_fis_mcp_server.server import search_resources
+
+        # Call the function and expect exception
+        with pytest.raises(ClientError):
+            await search_resources(self.mock_context, query_string=query_string, view_arn=view_arn)
+
+        # Verify error was logged
         self.mock_context.error.assert_called_once()
 
 

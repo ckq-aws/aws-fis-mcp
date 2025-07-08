@@ -29,6 +29,7 @@ The server provides the following MCP tools:
    #### AWS Resource Explorer Tools
    - `list_resource_explorer_views`: Lists all Resource Explorer views
    - `create_resource_explorer_view`: Creates a new Resource Explorer view (requires --allow-writes flag)
+   - `search_resources`: Searches for AWS resources using Resource Explorer based on query string and view ARN
    - `discover_resource_relationships`: Discovers relationships for a specific AWS resource using AWS Config
 
 ## Requirements
@@ -136,7 +137,7 @@ The MCP Inspector is a powerful tool for debugging and troubleshooting your MCP 
 ### Installing & Running MCP Inspector
 
 1. Install Node.js if you haven't already: https://nodejs.org/en/download. This will automatically install npx which is needed to run the mcp inspector. The inspector runs directly through npx without requiring installation.
-2. Change directory: 
+2. Change directory:
 ```
 cd src/aws-fis-mcp-server
 ```

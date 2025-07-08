@@ -320,8 +320,8 @@ async def start_experiment(
 
 """AWS Resource Discovery Tools.
 
-This section provides MCP tools for discovering AWS resources using CloudFormation and 
-Resource Explorer services. These tools enable the identification of potential targets 
+This section provides MCP tools for discovering AWS resources using CloudFormation and
+Resource Explorer services. These tools enable the identification of potential targets
 for fault injection experiments across the AWS account.
 
 The tools offer methods to list resources from different sources, create and manage
@@ -423,6 +423,63 @@ async def list_views(ctx: Context) -> List[Dict[str, Any]]:
         return all_views
     except Exception as e:
         await ctx.error(f'Error listing Resource Explorer views: {str(e)}')
+        raise
+
+
+@mcp.tool(name='search_resources')
+async def search_resources(
+    ctx: Context,
+    query_string: str = Field(..., description='The query string to search for resources'),
+    view_arn: str = Field(..., description='The ARN of the Resource Explorer view to use'),
+    max_results: int = Field(100, description='Maximum number of results to return'),
+    next_token: Optional[str] = Field(None, description='Token for pagination'),
+) -> Dict[str, Any]:
+    """Search for AWS resources using Resource Explorer.
+
+    This tool searches for AWS resources using Resource Explorer based on a query string
+    and view ARN. It can be used to find specific resources for fault injection experiments.
+
+    Args:
+        ctx: The MCP context for logging and communication
+        query_string: The query string to search for resources
+        view_arn: The ARN of the Resource Explorer view to use
+        max_results: Maximum number of results to return (default: 100)
+        next_token: Token for pagination (optional)
+
+    Returns:
+        Dict containing search results and pagination information
+    """
+    try:
+        # Build search parameters
+        search_params = {
+            'QueryString': query_string,
+            'ViewArn': view_arn,
+            'MaxResults': max_results,
+        }
+
+        # Add next token if provided
+        if next_token:
+            search_params['NextToken'] = next_token
+
+        # Execute search
+        response = resource_explorer.search(**search_params)
+
+        # Format results
+        result = {
+            'resources': response.get('Resources', []),
+            'query_string': query_string,
+            'view_arn': view_arn,
+            'count': len(response.get('Resources', [])),
+        }
+
+        # Only include next_token if it exists in the response
+        if 'NextToken' in response:
+            result['next_token'] = response['NextToken']
+
+        await ctx.info(f'Found {result["count"]} resources matching query: {query_string}')
+        return result
+    except Exception as e:
+        await ctx.error(f'Error searching resources: {str(e)}')
         raise
 
 
@@ -596,8 +653,8 @@ This section provides MCP tools for creating and managing AWS Fault Injection Si
 experiment templates. Experiment templates define the parameters for fault injection
 experiments, including targets, actions, and stop conditions.
 
-These tools allow for the creation of complex experiment templates with full configuration 
-options. They handle the AWS API interactions, error handling, and provide structured 
+These tools allow for the creation of complex experiment templates with full configuration
+options. They handle the AWS API interactions, error handling, and provide structured
 responses suitable for consumption by LLMs.
 
 Experiment templates created through these tools can later be used to run
