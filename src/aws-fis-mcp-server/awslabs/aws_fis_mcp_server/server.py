@@ -25,7 +25,6 @@ from awslabs.aws_fis_mcp_server.consts import (
     AWS_CONFIG_RETRY_MODE,
     AWS_CONFIG_SIGNATURE_VERSION,
     DEFAULT_AWS_REGION,
-    DEFAULT_MAX_RESOURCES,
     ENV_AWS_REGION,
     ENV_FASTMCP_LOG_LEVEL,
     SERVICE_CLOUDFORMATION,
@@ -117,35 +116,48 @@ mcp = FastMCP(
 )
 
 
-class AwsFisActions:
-    """Class for AWS FIS experiment actions and operations.
+"""Class for AWS FIS experiment actions and operations.
 
-    This class provides tools for interacting with AWS Fault Injection Simulator (FIS)
-    experiments and templates. It enables listing, retrieving, and executing FIS experiments
-    through a set of static methods exposed as MCP tools.
+This class provides tools for interacting with AWS Fault Injection Simulator (FIS)
+experiments and templates. It enables listing, retrieving, and executing FIS experiments
+through a set of static methods exposed as MCP tools.
 
-    The class handles AWS API interactions, error handling, and provides structured responses
-    suitable for consumption by LLMs. It implements polling mechanisms with exponential backoff
-    for long-running operations and proper pagination handling for list operations.
+The class handles AWS API interactions, error handling, and provides structured responses
+suitable for consumption by LLMs. It implements polling mechanisms with exponential backoff
+for long-running operations and proper pagination handling for list operations.
+"""
+
+
+@mcp.tool(name='list_fis_experiments')
+async def list_all_fis_experiments(ctx: Context) -> Dict[str, Dict[str, Any]]:
+    """Retrieves a list of Experiments available in the AWS FIS service.
+
+    This tool fetches all FIS experiments in the current AWS account and region,
+    organizing them by name for easy reference. It handles pagination automatically.
+
+    Returns:
+    Dict containing experiment details organized by name
     """
+    try:
+        response = aws_fis.list_experiments()
+        experiments = response.get('experiments', [])
+        formatted_results = {}
 
-    @mcp.tool(name='list_fis_experiments')
-    async def list_all_fis_experiments(ctx: Context) -> Dict[str, Dict[str, Any]]:
-        """Retrieves a list of Experiments available in the AWS FIS service.
+        for item in experiments:
+            # Handle case where Name tag might not exist
+            experiment_name = item.get('tags', {}).get('Name', item.get('id', 'Unknown'))
+            formatted_results[experiment_name] = {
+                'id': item.get('id'),
+                'arn': str(item.get('arn')),
+                'experimentTemplateId': str(item.get('experimentTemplateId')),
+                'state': item.get('state'),
+                'experimentOptions': item.get('experimentOptions'),
+            }
 
-        This tool fetches all FIS experiments in the current AWS account and region,
-        organizing them by name for easy reference. It handles pagination automatically.
-
-        Returns:
-            Dict containing experiment details organized by name
-        """
-        try:
-            response = aws_fis.list_experiments()
-            experiments = response.get('experiments', [])
-            formatted_results = {}
-
-            for item in experiments:
-                # Handle case where Name tag might not exist
+        # Handle pagination if needed
+        while 'nextToken' in response:
+            response = aws_fis.list_experiments(nextToken=response['nextToken'])
+            for item in response.get('experiments', []):
                 experiment_name = item.get('tags', {}).get('Name', item.get('id', 'Unknown'))
                 formatted_results[experiment_name] = {
                     'id': item.get('id'),
@@ -155,778 +167,629 @@ class AwsFisActions:
                     'experimentOptions': item.get('experimentOptions'),
                 }
 
-            # Handle pagination if needed
-            while 'nextToken' in response:
-                response = aws_fis.list_experiments(nextToken=response['nextToken'])
-                for item in response.get('experiments', []):
-                    experiment_name = item.get('tags', {}).get('Name', item.get('id', 'Unknown'))
-                    formatted_results[experiment_name] = {
-                        'id': item.get('id'),
-                        'arn': str(item.get('arn')),
-                        'experimentTemplateId': str(item.get('experimentTemplateId')),
-                        'state': item.get('state'),
-                        'experimentOptions': item.get('experimentOptions'),
-                    }
+        return formatted_results
+    except Exception as e:
+        await ctx.error(f'Error listing FIS experiments: {str(e)}')
+        raise
 
-            return formatted_results
-        except Exception as e:
-            await ctx.error(f'Error listing FIS experiments: {str(e)}')
-            raise
 
-    @mcp.tool(name='get_experiment')
-    async def get_experiment_details(
-        ctx: Context,
-        id: str = Field(..., description='The experiment ID to retrieve details for'),
-    ) -> Dict[str, Any]:
-        """Get detailed information about a specific experiment.
+@mcp.tool(name='get_experiment')
+async def get_experiment_details(
+    ctx: Context,
+    id: str = Field(..., description='The experiment ID to retrieve details for'),
+) -> Dict[str, Any]:
+    """Get detailed information about a specific experiment.
 
-        This tool retrieves comprehensive information about a single FIS experiment
-        identified by its ID.
+    This tool retrieves comprehensive information about a single FIS experiment
+    identified by its ID.
 
-        Args:
-            ctx: The MCP context for logging and communication
-            id: The experiment ID
+    Args:
+        ctx: The MCP context for logging and communication
+        id: The experiment ID
 
-        Returns:
-            Dict containing experiment details
-        """
-        try:
-            response = aws_fis.get_experiment(id=id)
-            return response.get('experiment', {})
-        except Exception as e:
-            await ctx.error(f'Error getting experiment details: {str(e)}')
-            raise
+    Returns:
+        Dict containing experiment details
+    """
+    try:
+        response = aws_fis.get_experiment(id=id)
+        return response.get('experiment', {})
+    except Exception as e:
+        await ctx.error(f'Error getting experiment details: {str(e)}')
+        raise
 
-    @mcp.tool(name='list_experiment_templates')
-    async def list_experiment_templates(ctx: Context) -> List[Dict[str, Any]]:
-        """List all experiment templates.
 
-        This tool retrieves all FIS experiment templates in the current AWS account and region.
-        It handles pagination automatically to ensure all templates are returned.
+@mcp.tool(name='list_experiment_templates')
+async def list_experiment_templates(ctx: Context) -> List[Dict[str, Any]]:
+    """List all experiment templates.
 
-        Returns:
-            List of experiment templates with their details
-        """
-        try:
-            all_templates = []
-            response = aws_fis.list_experiment_templates()
+    This tool retrieves all FIS experiment templates in the current AWS account and region.
+    It handles pagination automatically to ensure all templates are returned.
+
+    Returns:
+        List of experiment templates with their details
+    """
+    try:
+        all_templates = []
+        response = aws_fis.list_experiment_templates()
+        all_templates.extend(response.get('experimentTemplates', []))
+
+        # Handle pagination
+        while 'nextToken' in response:
+            response = aws_fis.list_experiment_templates(nextToken=response['nextToken'])
             all_templates.extend(response.get('experimentTemplates', []))
 
-            # Handle pagination
-            while 'nextToken' in response:
-                response = aws_fis.list_experiment_templates(nextToken=response['nextToken'])
-                all_templates.extend(response.get('experimentTemplates', []))
-
-            return all_templates
-        except Exception as e:
-            await ctx.error(f'Error listing experiment templates: {str(e)}')
-            raise
-
-    @mcp.tool(name='get_experiment_template')
-    async def get_experiment_template(
-        ctx: Context,
-        id: str = Field(..., description='The experiment template ID to retrieve'),
-    ) -> Dict[str, Any]:
-        """Get detailed information about a specific experiment template.
-
-        This tool retrieves comprehensive information about a single FIS experiment template
-        identified by its ID.
-
-        Args:
-            ctx: The MCP context for logging and communication
-            id: The experiment template ID
-
-        Returns:
-            Dict containing experiment template details
-        """
-        try:
-            response = aws_fis.get_experiment_template(id=id)
-            return response
-        except Exception as e:
-            await ctx.error(f'Error getting experiment template: {str(e)}')
-            raise
-
-    @mcp.tool('start_experiment')
-    async def start_experiment(
-        ctx: Context,
-        id: str = Field(..., description='The experiment template ID to execute'),
-        name: str = Field(
-            ..., description='Required name for the experiment (will be added as Name tag)'
-        ),
-        tags: Optional[Dict[str, str]] = Field(
-            None, description='Optional additional tags to apply to the experiment'
-        ),
-        action: Optional[str] = Field(
-            'run-all',
-            description='The actions mode for experiment execution (run-all, skip-all, or stop-on-failure)',
-        ),
-    ) -> Dict[str, Any]:
-        """Starts an AWS FIS experiment and returns immediately after starting.
-
-        Args:
-            ctx: The MCP context for logging and communication
-            id: The experiment template ID
-            name: Required name for the experiment
-            tags: Optional additional tags to apply to the experiment
-            action: The actions mode (default: 'run-all')
-
-        Returns:
-            Dict containing experiment start response
-
-        Raises:
-            Exception: For AWS API errors or when writes are disabled
-        """
-        global allow_writes
-
-        # Check if writes are allowed
-        if not allow_writes:
-            error_msg = 'Write operations are disabled. Use --allow-writes flag to enable destructive operations like starting FIS experiments.'
-            await ctx.error(error_msg)
-            raise Exception(error_msg)
-
-        try:
-            # Start with Name tag as required
-            experiment_tags = {'Name': name}
-
-            # Add any additional tags if provided
-            if tags:
-                experiment_tags.update(tags)
-
-            response = aws_fis.start_experiment(
-                experimentTemplateId=id,
-                experimentOptions={'actionsMode': action},
-                tags=experiment_tags,
-            )
-
-            experiment_id = response['experiment']['id']
-            await ctx.info(f'Started experiment "{name}" with ID: {experiment_id}')
-
-            return {
-                'experiment_id': experiment_id,
-                'name': name,
-                'status': 'started',
-                'template_id': id,
-                'tags': experiment_tags,
-                'message': f'Experiment "{name}" started successfully. Use get_experiment tool to check status.',
-            }
-
-        except Exception as e:
-            await ctx.error(f'Error starting experiment: {str(e)}')
-            raise
+        return all_templates
+    except Exception as e:
+        await ctx.error(f'Error listing experiment templates: {str(e)}')
+        raise
 
 
-class ResourceDiscovery:
-    """Class for AWS resource discovery operations.
+@mcp.tool(name='get_experiment_template')
+async def get_experiment_template(
+    ctx: Context,
+    id: str = Field(..., description='The experiment template ID to retrieve'),
+) -> Dict[str, Any]:
+    """Get detailed information about a specific experiment template.
 
-    This class provides a unified interface for discovering AWS resources using both
-    CloudFormation and Resource Explorer services. It enables the identification of
-    potential targets for fault injection experiments across the AWS account.
+    This tool retrieves comprehensive information about a single FIS experiment template
+    identified by its ID.
 
-    The class offers methods to list resources from different sources, create and manage
-    Resource Explorer views, and filter resources based on specific criteria. It handles
-    pagination for large result sets and provides structured responses suitable for
-    consumption by LLMs.
+    Args:
+        ctx: The MCP context for logging and communication
+        id: The experiment template ID
 
-    This consolidated approach allows for more flexible resource discovery, making it easier
-    to design comprehensive resilience testing scenarios regardless of how resources were
-    provisioned.
+    Returns:
+        Dict containing experiment template details
     """
+    try:
+        response = aws_fis.get_experiment_template(id=id)
+        return response
+    except Exception as e:
+        await ctx.error(f'Error getting experiment template: {str(e)}')
+        raise
 
-    # @mcp.tool(name='discover_resources')
-    async def discover_resources(
-        ctx: Context,
-        source: str = Field(
-            ...,
-            description="Source to discover resources from: 'cloudformation', 'resource-explorer', or 'all'",
-        ),
-        stack_name: Optional[str] = Field(
-            None,
-            description="Name of the CloudFormation stack (required if source is 'cloudformation')",
-        ),
-        query: Optional[str] = Field(
-            None,
-            description="Filter query for Resource Explorer (optional for 'resource-explorer' source)",
-        ),
-        max_results: int = Field(
-            DEFAULT_MAX_RESOURCES, description='Maximum number of resources to return'
-        ),
-    ) -> Dict[str, Any]:
-        """Discover AWS resources from specified source(s).
 
-        This unified tool discovers resources from CloudFormation stacks, Resource Explorer,
-        or both, providing a comprehensive view of available resources for fault injection.
+@mcp.tool('start_experiment')
+async def start_experiment(
+    ctx: Context,
+    id: str = Field(..., description='The experiment template ID to execute'),
+    name: str = Field(
+        ..., description='Required name for the experiment (will be added as Name tag)'
+    ),
+    tags: Optional[Dict[str, str]] = Field(
+        None, description='Optional additional tags to apply to the experiment'
+    ),
+    action: Optional[str] = Field(
+        'run-all',
+        description='The actions mode for experiment execution (run-all, skip-all, or stop-on-failure)',
+    ),
+) -> Dict[str, Any]:
+    """Starts an AWS FIS experiment and returns immediately after starting.
 
-        Args:
-            ctx: The MCP context for logging and communication
-            source: Source to discover resources from ('cloudformation', 'resource-explorer', or 'all')
-            stack_name: Name of the CloudFormation stack (required if source is 'cloudformation')
-            query: Filter query for Resource Explorer (optional for 'resource-explorer' source)
-            max_results: Maximum number of resources to return
+    Args:
+        ctx: The MCP context for logging and communication
+        id: The experiment template ID
+        name: Required name for the experiment
+        tags: Optional additional tags to apply to the experiment
+        action: The actions mode (default: 'run-all')
 
-        Returns:
-            Dict containing discovered resources organized by source
-        """
-        result: Dict[str, Any] = {'resources': []}
+    Returns:
+        Dict containing experiment start response
 
-        try:
-            if source.lower() in ['cloudformation', 'all']:
-                if source.lower() == 'cloudformation' and not stack_name:
-                    raise ValueError("stack_name is required when source is 'cloudformation'")
+    Raises:
+        Exception: For AWS API errors or when writes are disabled
+    """
+    global allow_writes
 
-                if stack_name:
-                    # Get resources from specific stack
-                    cfn_resources = await ResourceDiscovery.get_stack_resources(ctx, stack_name)
-                    for resource in cfn_resources.get('resources', []):
-                        result['resources'].append(
-                            {
-                                'source': 'cloudformation',
-                                'stack_name': stack_name,
-                                'resource_type': resource.get('ResourceType'),
-                                'logical_id': resource.get('LogicalResourceId'),
-                                'physical_id': resource.get('PhysicalResourceId'),
-                                'status': resource.get('ResourceStatus'),
-                            }
-                        )
-                elif source.lower() == 'all':
-                    # List all stacks and get their resources
-                    stacks_response = await ResourceDiscovery.list_cfn_stacks(ctx)
-                    stacks = stacks_response.get('stacks', [])
+    # Check if writes are allowed
+    if not allow_writes:
+        error_msg = 'Write operations are disabled. Use --allow-writes flag to enable destructive operations like starting FIS experiments.'
+        await ctx.error(error_msg)
+        raise Exception(error_msg)
 
-                    # Limit the number of stacks to process to avoid timeouts
-                    for stack in stacks[: min(5, len(stacks))]:
-                        stack_name = stack.get('StackName')
-                        if not stack_name:
-                            continue
-                        try:
-                            stack_resources = await ResourceDiscovery.get_stack_resources(
-                                ctx, stack_name
-                            )
-                            for resource in stack_resources.get('resources', [])[
-                                : max_results // 2
-                            ]:  # Limit resources per stack
-                                result['resources'].append(
-                                    {
-                                        'source': 'cloudformation',
-                                        'stack_name': stack_name,
-                                        'resource_type': resource.get('ResourceType'),
-                                        'logical_id': resource.get('LogicalResourceId'),
-                                        'physical_id': resource.get('PhysicalResourceId'),
-                                        'status': resource.get('ResourceStatus'),
-                                    }
-                                )
-                        except Exception as e:
-                            await ctx.warning(
-                                f'Error getting resources for stack {stack_name}: {str(e)}'
-                            )
+    try:
+        # Start with Name tag as required
+        experiment_tags = {'Name': name}
 
-            if source.lower() in ['resource-explorer', 'all']:
-                # Get resources from Resource Explorer
-                try:
-                    params: Dict[str, Any] = {
-                        'MaxResults': max_results // 2 if source.lower() == 'all' else max_results
-                    }
-                    if query:
-                        params['QueryString'] = query
+        # Add any additional tags if provided
+        if tags:
+            experiment_tags.update(tags)
 
-                    response = resource_explorer.search(**params)
-                    resources = response.get('Resources', [])
+        response = aws_fis.start_experiment(
+            experimentTemplateId=id,
+            experimentOptions={'actionsMode': action},
+            tags=experiment_tags,
+        )
 
-                    for item in resources:
-                        result['resources'].append(
-                            {
-                                'source': 'resource-explorer',
-                                'service': item.get('Service'),
-                                'region': item.get('Region'),
-                                'resource_type': item.get('ResourceType'),
-                                'arn': item.get('Arn'),
-                            }
-                        )
+        experiment_id = response['experiment']['id']
+        await ctx.info(f'Started experiment "{name}" with ID: {experiment_id}')
 
-                    # Handle pagination
-                    while 'NextToken' in response and len(result['resources']) < max_results:
-                        params['NextToken'] = response['NextToken']
-                        response = resource_explorer.search(**params)
-                        for item in response.get('Resources', []):
-                            result['resources'].append(
-                                {
-                                    'source': 'resource-explorer',
-                                    'service': item.get('Service'),
-                                    'region': item.get('Region'),
-                                    'resource_type': item.get('ResourceType'),
-                                    'arn': item.get('Arn'),
-                                }
-                            )
-                            if len(result['resources']) >= max_results:
-                                break
-                except Exception as e:
-                    await ctx.warning(
-                        f'Error searching resources with Resource Explorer: {str(e)}'
-                    )
+        return {
+            'experiment_id': experiment_id,
+            'name': name,
+            'status': 'started',
+            'template_id': id,
+            'tags': experiment_tags,
+            'message': f'Experiment "{name}" started successfully. Use get_experiment tool to check status.',
+        }
 
-            # Add metadata about the discovery
-            result['metadata'] = {
-                'total_resources': len(result['resources']),
-                'sources_used': source,
-                'max_results': max_results,
-            }
+    except Exception as e:
+        await ctx.error(f'Error starting experiment: {str(e)}')
+        raise
 
-            return result
-        except Exception as e:
-            await ctx.error(f'Resource discovery failed: {str(e)}')
-            raise
 
-    @mcp.tool(name='list_cfn_stacks')
-    async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
-        """Retrieve all AWS CloudFormation Stacks.
+"""Class for AWS resource discovery operations.
 
-        This tool lists all CloudFormation stacks in the current AWS account and region,
-        providing information that can help identify potential targets for fault injection.
+This class provides a unified interface for discovering AWS resources using both
+CloudFormation and Resource Explorer services. It enables the identification of
+potential targets for fault injection experiments across the AWS account.
 
-        Returns:
-            Dict containing CloudFormation stack information
-        """
-        try:
-            all_stacks = []
-            cfn = cloudformation
-            response = cfn.list_stacks()
+The class offers methods to list resources from different sources, create and manage
+Resource Explorer views, and filter resources based on specific criteria. It handles
+pagination for large result sets and provides structured responses suitable for
+consumption by LLMs.
+
+This consolidated approach allows for more flexible resource discovery, making it easier
+to design comprehensive resilience testing scenarios regardless of how resources were
+provisioned.
+"""
+
+
+@mcp.tool(name='list_cfn_stacks')
+async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
+    """Retrieve all AWS CloudFormation Stacks.
+
+    This tool lists all CloudFormation stacks in the current AWS account and region,
+    providing information that can help identify potential targets for fault injection.
+
+    Returns:
+        Dict containing CloudFormation stack information
+    """
+    try:
+        all_stacks = []
+        cfn = cloudformation
+        response = cfn.list_stacks()
+        all_stacks.extend(response.get('StackSummaries', []))
+
+        # Handle pagination
+        while 'NextToken' in response:
+            response = cfn.list_stacks(NextToken=response['NextToken'])
             all_stacks.extend(response.get('StackSummaries', []))
 
-            # Handle pagination
-            while 'NextToken' in response:
-                response = cfn.list_stacks(NextToken=response['NextToken'])
-                all_stacks.extend(response.get('StackSummaries', []))
+        return {'stacks': all_stacks}
+    except Exception as e:
+        await ctx.error(f'Error listing CloudFormation stacks: {str(e)}')
+        raise
 
-            return {'stacks': all_stacks}
-        except Exception as e:
-            await ctx.error(f'Error listing CloudFormation stacks: {str(e)}')
-            raise
 
-    @mcp.tool(name='get_stack_resources')
-    async def get_stack_resources(
-        ctx: Context,
-        stack_name: str = Field(
-            ..., description='Name of the CloudFormation stack to retrieve resources from'
-        ),
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        """Retrieves the resources that have been created by an individual stack.
+@mcp.tool(name='get_stack_resources')
+async def get_stack_resources(
+    ctx: Context,
+    stack_name: str = Field(
+        ..., description='Name of the CloudFormation stack to retrieve resources from'
+    ),
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Retrieves the resources that have been created by an individual stack.
 
-        This tool lists all resources within a specific CloudFormation stack,
-        which can be useful for identifying potential targets for fault injection experiments.
+    This tool lists all resources within a specific CloudFormation stack,
+    which can be useful for identifying potential targets for fault injection experiments.
 
-        Args:
-            ctx: The MCP context for logging and communication
-            stack_name: Name of the CloudFormation stack
+    Args:
+        ctx: The MCP context for logging and communication
+        stack_name: Name of the CloudFormation stack
 
-        Returns:
-            Dict containing stack resources
-        """
-        try:
-            all_resources = []
-            cfn = cloudformation
-            response = cfn.list_stack_resources(StackName=stack_name)
+    Returns:
+        Dict containing stack resources
+    """
+    try:
+        all_resources = []
+        cfn = cloudformation
+        response = cfn.list_stack_resources(StackName=stack_name)
+        all_resources.extend(response.get('StackResourceSummaries', []))
+
+        # Handle pagination
+        while 'NextToken' in response:
+            response = cfn.list_stack_resources(
+                StackName=stack_name, NextToken=response['NextToken']
+            )
             all_resources.extend(response.get('StackResourceSummaries', []))
 
-            # Handle pagination
-            while 'NextToken' in response:
-                response = cfn.list_stack_resources(
-                    StackName=stack_name, NextToken=response['NextToken']
-                )
-                all_resources.extend(response.get('StackResourceSummaries', []))
+        return {'resources': all_resources}
+    except Exception as e:
+        await ctx.error(f'Error getting stack resources: {str(e)}')
+        raise
 
-            return {'resources': all_resources}
-        except Exception as e:
-            await ctx.error(f'Error getting stack resources: {str(e)}')
-            raise
 
-    @mcp.tool(name='list_resource_explorer_views')
-    async def list_views(ctx: Context) -> List[Dict[str, Any]]:
-        """List Resource Explorer views.
+@mcp.tool(name='list_resource_explorer_views')
+async def list_views(ctx: Context) -> List[Dict[str, Any]]:
+    """List Resource Explorer views.
 
-        This tool retrieves all Resource Explorer views in the current AWS account and region,
-        which can be used to find and filter resources for fault injection experiments.
+    This tool retrieves all Resource Explorer views in the current AWS account and region,
+    which can be used to find and filter resources for fault injection experiments.
 
-        Returns:
-            List of Resource Explorer views
-        """
-        try:
-            all_views = []
-            response = resource_explorer.list_views()
+    Returns:
+        List of Resource Explorer views
+    """
+    try:
+        all_views = []
+        response = resource_explorer.list_views()
+        all_views.extend(response.get('Views', []))
+
+        # Handle pagination
+        while 'NextToken' in response:
+            response = resource_explorer.list_views(NextToken=response['NextToken'])
             all_views.extend(response.get('Views', []))
 
-            # Handle pagination
-            while 'NextToken' in response:
-                response = resource_explorer.list_views(NextToken=response['NextToken'])
-                all_views.extend(response.get('Views', []))
+        return all_views
+    except Exception as e:
+        await ctx.error(f'Error listing Resource Explorer views: {str(e)}')
+        raise
 
-            return all_views
-        except Exception as e:
-            await ctx.error(f'Error listing Resource Explorer views: {str(e)}')
-            raise
 
-    @mcp.tool(name='create_resource_explorer_view')
-    async def create_view(
-        ctx: Context,
-        query: str = Field(..., description='Filter string for the view'),
-        view_name: str = Field(..., description='Name of the view'),
-        name: str = Field(
-            ..., description='Required name for the view (will be added as Name tag)'
-        ),
-        tags: Optional[Dict[str, str]] = Field(
-            None, description='Optional additional tags to apply to the view'
-        ),
-        scope: Optional[str] = Field(None, description='Scope of the view'),
-        client_token: Optional[str] = Field(None, description='Client token for idempotency'),
-    ) -> Dict[str, Any]:
-        """Create a Resource Explorer view.
+@mcp.tool(name='create_resource_explorer_view')
+async def create_view(
+    ctx: Context,
+    query: str = Field(..., description='Filter string for the view'),
+    view_name: str = Field(..., description='Name of the view'),
+    name: str = Field(..., description='Required name for the view (will be added as Name tag)'),
+    tags: Optional[Dict[str, str]] = Field(
+        None, description='Optional additional tags to apply to the view'
+    ),
+    scope: Optional[str] = Field(None, description='Scope of the view'),
+    client_token: Optional[str] = Field(None, description='Client token for idempotency'),
+) -> Dict[str, Any]:
+    """Create a Resource Explorer view.
 
-        This tool creates a new Resource Explorer view that can be used to find
-        and filter resources for fault injection experiments.
+    This tool creates a new Resource Explorer view that can be used to find
+    and filter resources for fault injection experiments.
 
-        Args:
-            ctx: The MCP context for logging and communication
-            query: Filter string for the view
-            view_name: Name of the view
-            name: Required name for the view (will be added as Name tag)
-            tags: Optional additional tags to apply to the view
-            scope: Scope of the view
-            client_token: Client token for idempotency
+    Args:
+        ctx: The MCP context for logging and communication
+        query: Filter string for the view
+        view_name: Name of the view
+        name: Required name for the view (will be added as Name tag)
+        tags: Optional additional tags to apply to the view
+        scope: Scope of the view
+        client_token: Client token for idempotency
 
-        Returns:
-            Dict containing the created view details
+    Returns:
+        Dict containing the created view details
 
-        Raises:
-            Exception: For AWS API errors or when writes are disabled
-        """
-        global allow_writes
+    Raises:
+        Exception: For AWS API errors or when writes are disabled
+    """
+    global allow_writes
 
-        # Check if writes are allowed
-        if not allow_writes:
-            error_msg = 'Write operations are disabled. Use --allow-writes flag to enable Resource Explorer view creation.'
-            await ctx.error(error_msg)
-            raise Exception(error_msg)
+    # Check if writes are allowed
+    if not allow_writes:
+        error_msg = 'Write operations are disabled. Use --allow-writes flag to enable Resource Explorer view creation.'
+        await ctx.error(error_msg)
+        raise Exception(error_msg)
 
-        try:
-            # Start with Name tag as required
-            view_tags = {'Name': name}
+    try:
+        # Start with Name tag as required
+        view_tags = {'Name': name}
 
-            # Add any additional tags if provided
-            if tags:
-                view_tags.update(tags)
+        # Add any additional tags if provided
+        if tags:
+            view_tags.update(tags)
 
-            # Generate client token if not provided
-            if not client_token:
-                client_token = f'create-view-{int(time.time())}'
+        # Generate client token if not provided
+        if not client_token:
+            client_token = f'create-view-{int(time.time())}'
 
-            response = resource_explorer.create_view(
-                ClientToken=client_token,
-                Filters={'FilterString': query},
-                Scope=scope,
-                Tags=view_tags,
-                ViewName=view_name,
-            )
+        response = resource_explorer.create_view(
+            ClientToken=client_token,
+            Filters={'FilterString': query},
+            Scope=scope,
+            Tags=view_tags,
+            ViewName=view_name,
+        )
 
-            await ctx.info(f'Created Resource Explorer view "{name}" with name: {view_name}')
-            return response
-        except Exception as e:
-            await ctx.error(f'Error creating Resource Explorer view: {str(e)}')
-            raise
+        await ctx.info(f'Created Resource Explorer view "{name}" with name: {view_name}')
+        return response
+    except Exception as e:
+        await ctx.error(f'Error creating Resource Explorer view: {str(e)}')
+        raise
 
-    @mcp.tool(name='discover_resource_relationships')
-    async def discover_relationships(
-        ctx: Context,
-        resource_type: str = Field(
-            ...,
-            description='AWS resource type (e.g., AWS::EC2::Instance, AWS::ElasticLoadBalancingV2::LoadBalancer)',
-        ),
-        resource_id: str = Field(..., description='AWS resource ID to discover relationships for'),
-        limit: Optional[int] = Field(
-            10, description='Maximum number of configuration items to retrieve'
-        ),
-        chronological_order: Optional[str] = Field(
-            'Reverse', description='Order of configuration items (Reverse or Forward)'
-        ),
-    ) -> Dict[str, Any]:
-        """Discover relationships for a specific AWS resource using AWS Config.
 
-        This tool retrieves the configuration history for a specific AWS resource
-        and returns its relationships with other resources. This is useful for
-        understanding resource dependencies, such as finding which subnet an ALB
-        is placed in or which security groups are attached to an instance.
+@mcp.tool(name='discover_resource_relationships')
+async def discover_relationships(
+    ctx: Context,
+    resource_type: str = Field(
+        ...,
+        description='AWS resource type (e.g., AWS::EC2::Instance, AWS::ElasticLoadBalancingV2::LoadBalancer)',
+    ),
+    resource_id: str = Field(..., description='AWS resource ID to discover relationships for'),
+    limit: Optional[int] = Field(
+        10, description='Maximum number of configuration items to retrieve'
+    ),
+    chronological_order: Optional[str] = Field(
+        'Reverse', description='Order of configuration items (Reverse or Forward)'
+    ),
+) -> Dict[str, Any]:
+    """Discover relationships for a specific AWS resource using AWS Config.
 
-        Args:
-            ctx: The MCP context for logging and communication
-            resource_type: AWS resource type (e.g., AWS::EC2::Instance)
-            resource_id: AWS resource ID to discover relationships for
-            limit: Maximum number of configuration items to retrieve
-            chronological_order: Order of configuration items (Reverse or Forward)
+    This tool retrieves the configuration history for a specific AWS resource
+    and returns its relationships with other resources. This is useful for
+    understanding resource dependencies, such as finding which subnet an ALB
+    is placed in or which security groups are attached to an instance.
 
-        Returns:
-            Dict containing resource relationships and configuration details
-        """
-        try:
-            # Get resource configuration history
-            params = {
-                'resourceType': resource_type,
-                'resourceId': resource_id,
-                'chronologicalOrder': chronological_order,
-            }
+    Args:
+        ctx: The MCP context for logging and communication
+        resource_type: AWS resource type (e.g., AWS::EC2::Instance)
+        resource_id: AWS resource ID to discover relationships for
+        limit: Maximum number of configuration items to retrieve
+        chronological_order: Order of configuration items (Reverse or Forward)
 
-            if limit:
-                params['limit'] = limit
+    Returns:
+        Dict containing resource relationships and configuration details
+    """
+    try:
+        # Get resource configuration history
+        params = {
+            'resourceType': resource_type,
+            'resourceId': resource_id,
+            'chronologicalOrder': chronological_order,
+        }
 
-            response = aws_config_client.get_resource_config_history(**params)
+        if limit:
+            params['limit'] = limit
 
-            result = {
-                'resource_type': resource_type,
-                'resource_id': resource_id,
-                'relationships': [],
-                'configuration_items': [],
-            }
+        response = aws_config_client.get_resource_config_history(**params)
 
-            # Process configuration items
-            config_items = response.get('configurationItems', [])
+        result = {
+            'resource_type': resource_type,
+            'resource_id': resource_id,
+            'relationships': [],
+            'configuration_items': [],
+        }
 
-            if not config_items:
-                result['message'] = 'No configuration items found for the specified resource'
-                return result
+        # Process configuration items
+        config_items = response.get('configurationItems', [])
 
-            # Extract relationships from the most recent configuration item
-            latest_config = config_items[0] if config_items else {}
-            relationships = latest_config.get('relationships', [])
-
-            result['relationships'] = relationships
-
-            # Include configuration item details (without sensitive data)
-            for item in config_items:
-                config_summary = {
-                    'configuration_item_capture_time': str(
-                        item.get('configurationItemCaptureTime', '')
-                    ),
-                    'configuration_state_id': item.get('configurationStateId'),
-                    'aws_region': item.get('awsRegion'),
-                    'availability_zone': item.get('availabilityZone'),
-                    'resource_creation_time': str(item.get('resourceCreationTime', '')),
-                    'tags': item.get('tags', {}),
-                    'relationships_count': len(item.get('relationships', [])),
-                }
-                result['configuration_items'].append(config_summary)
-
-            # Add summary statistics
-            result['summary'] = {
-                'total_relationships': len(relationships),
-                'total_configuration_items': len(config_items),
-                'relationship_types': list(
-                    {rel.get('relationshipName', '') for rel in relationships}
-                ),
-            }
-
-            await ctx.info(
-                f'Found {len(relationships)} relationships for {resource_type} {resource_id}'
-            )
+        if not config_items:
+            result['message'] = 'No configuration items found for the specified resource'
             return result
 
-        except Exception as e:
-            await ctx.error(f'Error discovering resource relationships: {str(e)}')
-            raise
+        # Extract relationships from the most recent configuration item
+        latest_config = config_items[0] if config_items else {}
+        relationships = latest_config.get('relationships', [])
+
+        result['relationships'] = relationships
+
+        # Include configuration item details (without sensitive data)
+        for item in config_items:
+            config_summary = {
+                'configuration_item_capture_time': str(
+                    item.get('configurationItemCaptureTime', '')
+                ),
+                'configuration_state_id': item.get('configurationStateId'),
+                'aws_region': item.get('awsRegion'),
+                'availability_zone': item.get('availabilityZone'),
+                'resource_creation_time': str(item.get('resourceCreationTime', '')),
+                'tags': item.get('tags', {}),
+                'relationships_count': len(item.get('relationships', [])),
+            }
+            result['configuration_items'].append(config_summary)
+
+        # Add summary statistics
+        result['summary'] = {
+            'total_relationships': len(relationships),
+            'total_configuration_items': len(config_items),
+            'relationship_types': list({rel.get('relationshipName', '') for rel in relationships}),
+        }
+
+        await ctx.info(
+            f'Found {len(relationships)} relationships for {resource_type} {resource_id}'
+        )
+        return result
+
+    except Exception as e:
+        await ctx.error(f'Error discovering resource relationships: {str(e)}')
+        raise
 
 
-class ExperimentTemplates:
-    """Class for managing AWS FIS experiment templates.
+"""Class for managing AWS FIS experiment templates.
 
-    This class provides tools for creating and managing AWS Fault Injection Simulator (FIS)
-    experiment templates. Experiment templates define the parameters for fault injection
-    experiments, including targets, actions, and stop conditions.
+This class provides tools for creating and managing AWS Fault Injection Simulator (FIS)
+experiment templates. Experiment templates define the parameters for fault injection
+experiments, including targets, actions, and stop conditions.
 
-    The class exposes methods as MCP tools that allow for the creation of complex
-    experiment templates with full configuration options. It handles the AWS API interactions,
-    error handling, and provides structured responses suitable for consumption by LLMs.
+The class exposes methods as MCP tools that allow for the creation of complex
+experiment templates with full configuration options. It handles the AWS API interactions,
+error handling, and provides structured responses suitable for consumption by LLMs.
 
-    Experiment templates created through this class can later be used to run
-    actual fault injection experiments using the AwsFisActions class.
+Experiment templates created through this class can later be used to run
+actual fault injection experiments using the AwsFisActions class.
+"""
+
+
+@mcp.tool(name='create_experiment_template')
+async def create_experiment_template(
+    ctx: Context,
+    clientToken: str = Field(..., description='Client token for idempotency'),
+    description: str = Field(..., description='Description of the experiment template'),
+    role_arn: str = Field(..., description='IAM role ARN for experiment execution'),
+    name: str = Field(
+        ...,
+        description='Required name for the experiment template (will be added as Name tag)',
+    ),
+    tags: Optional[Dict[str, str]] = Field(
+        None, description='Optional additional tags to apply to the template'
+    ),
+    stop_conditions: Optional[List[Dict[str, str]]] = Field(
+        None, description='Conditions that stop the experiment'
+    ),
+    targets: Optional[Dict[str, Dict[str, Any]]] = Field(
+        None, description='Target resources for the experiment'
+    ),
+    actions: Optional[Dict[str, Dict[str, Any]]] = Field(
+        None, description='Actions to perform during the experiment'
+    ),
+    log_configuration: Optional[Dict[str, Any]] = Field(
+        None, description='Configuration for experiment logging'
+    ),
+    experiment_options: Optional[Dict[str, str]] = Field(
+        None, description='Additional experiment options'
+    ),
+    report_configuration: Optional[Dict[str, Any]] = Field(
+        None, description='Configuration for experiment reporting'
+    ),
+) -> Dict[str, Any]:
+    """Create a new AWS FIS experiment template.
+
+    This tool creates a new experiment template that defines the parameters for
+    fault injection experiments, including targets, actions, and stop conditions.
+
+    Args:
+        ctx: The MCP context for logging and communication
+        clientToken: Client token for idempotency
+        description: Description of the experiment template
+        role_arn: IAM role ARN for experiment execution
+        name: Required name for the experiment template (will be added as Name tag)
+        tags: Optional additional tags to apply to the template
+        stop_conditions: Conditions that stop the experiment
+        targets: Target resources for the experiment
+        actions: Actions to perform during the experiment
+        log_configuration: Configuration for experiment logging
+        experiment_options: Additional experiment options
+        report_configuration: Configuration for experiment reporting
+
+    Returns:
+        Dict containing the created experiment template
+
+    Raises:
+        Exception: For AWS API errors or when writes are disabled
     """
+    global allow_writes
 
-    @mcp.tool(name='create_experiment_template')
-    async def create_experiment_template(
-        ctx: Context,
-        clientToken: str = Field(..., description='Client token for idempotency'),
-        description: str = Field(..., description='Description of the experiment template'),
-        role_arn: str = Field(..., description='IAM role ARN for experiment execution'),
-        name: str = Field(
-            ...,
-            description='Required name for the experiment template (will be added as Name tag)',
-        ),
-        tags: Optional[Dict[str, str]] = Field(
-            None, description='Optional additional tags to apply to the template'
-        ),
-        stop_conditions: Optional[List[Dict[str, str]]] = Field(
-            None, description='Conditions that stop the experiment'
-        ),
-        targets: Optional[Dict[str, Dict[str, Any]]] = Field(
-            None, description='Target resources for the experiment'
-        ),
-        actions: Optional[Dict[str, Dict[str, Any]]] = Field(
-            None, description='Actions to perform during the experiment'
-        ),
-        log_configuration: Optional[Dict[str, Any]] = Field(
-            None, description='Configuration for experiment logging'
-        ),
-        experiment_options: Optional[Dict[str, str]] = Field(
-            None, description='Additional experiment options'
-        ),
-        report_configuration: Optional[Dict[str, Any]] = Field(
-            None, description='Configuration for experiment reporting'
-        ),
-    ) -> Dict[str, Any]:
-        """Create a new AWS FIS experiment template.
+    # Check if writes are allowed
+    if not allow_writes:
+        error_msg = (
+            'Write operations are disabled. Use --allow-writes flag to enable template creation.'
+        )
+        await ctx.error(error_msg)
+        raise Exception(error_msg)
 
-        This tool creates a new experiment template that defines the parameters for
-        fault injection experiments, including targets, actions, and stop conditions.
+    try:
+        # Start with Name tag as required
+        template_tags = {'Name': name}
 
-        Args:
-            ctx: The MCP context for logging and communication
-            clientToken: Client token for idempotency
-            description: Description of the experiment template
-            role_arn: IAM role ARN for experiment execution
-            name: Required name for the experiment template (will be added as Name tag)
-            tags: Optional additional tags to apply to the template
-            stop_conditions: Conditions that stop the experiment
-            targets: Target resources for the experiment
-            actions: Actions to perform during the experiment
-            log_configuration: Configuration for experiment logging
-            experiment_options: Additional experiment options
-            report_configuration: Configuration for experiment reporting
+        # Add any additional tags if provided
+        if tags:
+            template_tags.update(tags)
 
-        Returns:
-            Dict containing the created experiment template
+        # Default empty collections
+        stop_conditions = stop_conditions or []
+        targets = targets or {}
+        actions = actions or {}
 
-        Raises:
-            Exception: For AWS API errors or when writes are disabled
-        """
-        global allow_writes
+        response = aws_fis.create_experiment_template(
+            clientToken=clientToken,
+            description=description,
+            stopConditions=stop_conditions,
+            targets=targets,
+            actions=actions,
+            roleArn=role_arn,
+            tags=template_tags,
+            logConfiguration=log_configuration,
+            experimentOptions=experiment_options,
+            experimentReportConfiguration=report_configuration,
+        )
 
-        # Check if writes are allowed
-        if not allow_writes:
-            error_msg = 'Write operations are disabled. Use --allow-writes flag to enable template creation.'
-            await ctx.error(error_msg)
-            raise Exception(error_msg)
+        await ctx.info(
+            f'Created experiment template "{name}" with ID: {response.get("experimentTemplate", {}).get("id", "unknown")}'
+        )
+        return response
+    except Exception as e:
+        await ctx.error(f'Error creating experiment template: {str(e)}')
+        raise
 
-        try:
-            # Start with Name tag as required
-            template_tags = {'Name': name}
 
-            # Add any additional tags if provided
-            if tags:
-                template_tags.update(tags)
+@mcp.tool(name='update_experiment_template')
+async def update_experiment_template(
+    ctx: Context,
+    id: str = Field(..., description='ID of the experiment template to update'),
+    description: Optional[str] = Field(
+        None, description='Updated description of the experiment template'
+    ),
+    stop_conditions: Optional[List[Dict[str, str]]] = Field(
+        None, description='Updated conditions that stop the experiment'
+    ),
+    targets: Optional[Dict[str, Dict[str, Any]]] = Field(
+        None, description='Updated target resources for the experiment'
+    ),
+    actions: Optional[Dict[str, Dict[str, Any]]] = Field(
+        None, description='Updated actions to perform during the experiment'
+    ),
+    role_arn: Optional[str] = Field(
+        None, description='Updated IAM role ARN for experiment execution'
+    ),
+    log_configuration: Optional[Dict[str, Any]] = Field(
+        None, description='Updated configuration for experiment logging'
+    ),
+    experiment_options: Optional[Dict[str, str]] = Field(
+        None, description='Updated experiment options'
+    ),
+    experiment_report_configuration: Optional[Dict[str, Any]] = Field(
+        None, description='Updated configuration for experiment reporting'
+    ),
+) -> Dict[str, Any]:
+    """Update an existing AWS FIS experiment template.
 
-            # Default empty collections
-            stop_conditions = stop_conditions or []
-            targets = targets or {}
-            actions = actions or {}
+    This tool updates an existing experiment template with new parameters for
+    fault injection experiments, including targets, actions, and stop conditions.
 
-            response = aws_fis.create_experiment_template(
-                clientToken=clientToken,
-                description=description,
-                stopConditions=stop_conditions,
-                targets=targets,
-                actions=actions,
-                roleArn=role_arn,
-                tags=template_tags,
-                logConfiguration=log_configuration,
-                experimentOptions=experiment_options,
-                experimentReportConfiguration=report_configuration,
-            )
+    Args:
+        ctx: The MCP context for logging and communication
+        id: ID of the experiment template to update
+        description: Updated description of the experiment template
+        stop_conditions: Updated conditions that stop the experiment
+        targets: Updated target resources for the experiment
+        actions: Updated actions to perform during the experiment
+        role_arn: Updated IAM role ARN for experiment execution
+        log_configuration: Updated configuration for experiment logging
+        experiment_options: Updated experiment options
+        experiment_report_configuration: Updated configuration for experiment reporting
 
-            await ctx.info(
-                f'Created experiment template "{name}" with ID: {response.get("experimentTemplate", {}).get("id", "unknown")}'
-            )
-            return response
-        except Exception as e:
-            await ctx.error(f'Error creating experiment template: {str(e)}')
-            raise
+    Returns:
+        Dict containing the updated experiment template
+    """
+    try:
+        # Build the update parameters, only including non-None values
+        update_params: Dict[str, Any] = {'id': id}
 
-    @mcp.tool(name='update_experiment_template')
-    async def update_experiment_template(
-        ctx: Context,
-        id: str = Field(..., description='ID of the experiment template to update'),
-        description: Optional[str] = Field(
-            None, description='Updated description of the experiment template'
-        ),
-        stop_conditions: Optional[List[Dict[str, str]]] = Field(
-            None, description='Updated conditions that stop the experiment'
-        ),
-        targets: Optional[Dict[str, Dict[str, Any]]] = Field(
-            None, description='Updated target resources for the experiment'
-        ),
-        actions: Optional[Dict[str, Dict[str, Any]]] = Field(
-            None, description='Updated actions to perform during the experiment'
-        ),
-        role_arn: Optional[str] = Field(
-            None, description='Updated IAM role ARN for experiment execution'
-        ),
-        log_configuration: Optional[Dict[str, Any]] = Field(
-            None, description='Updated configuration for experiment logging'
-        ),
-        experiment_options: Optional[Dict[str, str]] = Field(
-            None, description='Updated experiment options'
-        ),
-        experiment_report_configuration: Optional[Dict[str, Any]] = Field(
-            None, description='Updated configuration for experiment reporting'
-        ),
-    ) -> Dict[str, Any]:
-        """Update an existing AWS FIS experiment template.
+        if description is not None:
+            update_params['description'] = description
 
-        This tool updates an existing experiment template with new parameters for
-        fault injection experiments, including targets, actions, and stop conditions.
+        if stop_conditions is not None:
+            update_params['stopConditions'] = stop_conditions
 
-        Args:
-            ctx: The MCP context for logging and communication
-            id: ID of the experiment template to update
-            description: Updated description of the experiment template
-            stop_conditions: Updated conditions that stop the experiment
-            targets: Updated target resources for the experiment
-            actions: Updated actions to perform during the experiment
-            role_arn: Updated IAM role ARN for experiment execution
-            log_configuration: Updated configuration for experiment logging
-            experiment_options: Updated experiment options
-            experiment_report_configuration: Updated configuration for experiment reporting
+        if targets is not None:
+            update_params['targets'] = targets
 
-        Returns:
-            Dict containing the updated experiment template
-        """
-        try:
-            # Build the update parameters, only including non-None values
-            update_params: Dict[str, Any] = {'id': id}
+        if actions is not None:
+            update_params['actions'] = actions
 
-            if description is not None:
-                update_params['description'] = description
+        if role_arn is not None:
+            update_params['roleArn'] = role_arn
 
-            if stop_conditions is not None:
-                update_params['stopConditions'] = stop_conditions
+        if log_configuration is not None:
+            update_params['logConfiguration'] = log_configuration
 
-            if targets is not None:
-                update_params['targets'] = targets
+        if experiment_options is not None:
+            update_params['experimentOptions'] = experiment_options
 
-            if actions is not None:
-                update_params['actions'] = actions
+        if experiment_report_configuration is not None:
+            update_params['experimentReportConfiguration'] = experiment_report_configuration
 
-            if role_arn is not None:
-                update_params['roleArn'] = role_arn
-
-            if log_configuration is not None:
-                update_params['logConfiguration'] = log_configuration
-
-            if experiment_options is not None:
-                update_params['experimentOptions'] = experiment_options
-
-            if experiment_report_configuration is not None:
-                update_params['experimentReportConfiguration'] = experiment_report_configuration
-
-            response = aws_fis.update_experiment_template(**update_params)
-            await ctx.info(f'Successfully updated experiment template: {id}')
-            return response
-        except Exception as e:
-            await ctx.error(f'Error updating experiment template: {str(e)}')
-            raise
+        response = aws_fis.update_experiment_template(**update_params)
+        await ctx.info(f'Successfully updated experiment template: {id}')
+        return response
+    except Exception as e:
+        await ctx.error(f'Error updating experiment template: {str(e)}')
+        raise
 
 
 def main():

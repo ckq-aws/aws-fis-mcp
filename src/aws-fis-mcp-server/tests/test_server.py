@@ -16,7 +16,20 @@
 
 import awslabs.aws_fis_mcp_server.server as server_module
 import pytest
-from awslabs.aws_fis_mcp_server.server import AwsFisActions, ExperimentTemplates, ResourceDiscovery
+from awslabs.aws_fis_mcp_server.server import (
+    create_experiment_template,
+    create_view,
+    discover_relationships,
+    get_experiment_details,
+    get_experiment_template,
+    get_stack_resources,
+    list_all_fis_experiments,
+    list_cfn_stacks,
+    list_experiment_templates,
+    list_views,
+    start_experiment,
+    update_experiment_template,
+)
 from botocore.exceptions import ClientError
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -52,7 +65,7 @@ class TestAwsFisActions:
             ]
         }
 
-        result = await AwsFisActions.list_all_fis_experiments(self.mock_context)
+        result = await list_all_fis_experiments(self.mock_context)
 
         assert len(result) == 1
         assert 'Test Experiment' in result
@@ -89,7 +102,7 @@ class TestAwsFisActions:
             },
         ]
 
-        result = await AwsFisActions.list_all_fis_experiments(self.mock_context)
+        result = await list_all_fis_experiments(self.mock_context)
 
         assert len(result) == 2
         assert 'Test Experiment 1' in result
@@ -104,7 +117,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await AwsFisActions.list_all_fis_experiments(self.mock_context)
+            await list_all_fis_experiments(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -121,7 +134,7 @@ class TestAwsFisActions:
             }
         }
 
-        result = await AwsFisActions.get_experiment_details(self.mock_context, id=experiment_id)
+        result = await get_experiment_details(self.mock_context, id=experiment_id)
 
         assert result['id'] == experiment_id
         assert result['state']['status'] == 'completed'
@@ -137,7 +150,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await AwsFisActions.get_experiment_details(self.mock_context, id=experiment_id)
+            await get_experiment_details(self.mock_context, id=experiment_id)
 
         self.mock_context.error.assert_called_once()
 
@@ -154,7 +167,7 @@ class TestAwsFisActions:
             ]
         }
 
-        result = await AwsFisActions.list_experiment_templates(self.mock_context)
+        result = await list_experiment_templates(self.mock_context)
 
         assert len(result) == 1
         assert result[0]['id'] == 'template-1'
@@ -174,7 +187,7 @@ class TestAwsFisActions:
             }
         }
 
-        result = await AwsFisActions.get_experiment_template(self.mock_context, id=template_id)
+        result = await get_experiment_template(self.mock_context, id=template_id)
 
         assert 'experimentTemplate' in result
         assert result['experimentTemplate']['id'] == template_id
@@ -201,7 +214,7 @@ class TestAwsFisActions:
         ]
 
         with patch('asyncio.sleep', new_callable=AsyncMock):
-            result = await AwsFisActions.start_experiment(
+            result = await start_experiment(
                 self.mock_context,
                 template_id,
                 'Test Experiment',
@@ -222,7 +235,7 @@ class TestAwsFisActions:
             'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
         }
 
-        result = await AwsFisActions.start_experiment(
+        result = await start_experiment(
             self.mock_context,
             template_id,
             'Test Experiment',
@@ -243,9 +256,7 @@ class TestAwsFisActions:
             'experiment': {'id': experiment_id, 'state': {'status': 'pending'}}
         }
 
-        result = await AwsFisActions.start_experiment(
-            self.mock_context, template_id, 'Test Experiment', None
-        )
+        result = await start_experiment(self.mock_context, template_id, 'Test Experiment', None)
         assert result['status'] == 'started'
         assert result['experiment_id'] == experiment_id
 
@@ -257,9 +268,7 @@ class TestAwsFisActions:
         self.mock_aws_fis.start_experiment.side_effect = Exception('Template not found')
 
         with pytest.raises(Exception, match='Template not found'):
-            await AwsFisActions.start_experiment(
-                self.mock_context, template_id, 'Test Experiment', None
-            )
+            await start_experiment(self.mock_context, template_id, 'Test Experiment', None)
 
     @pytest.mark.asyncio
     async def test_list_experiment_templates_with_pagination(self):
@@ -272,7 +281,7 @@ class TestAwsFisActions:
             {'experimentTemplates': [{'id': 'template-2', 'description': 'Template 2'}]},
         ]
 
-        result = await AwsFisActions.list_experiment_templates(self.mock_context)
+        result = await list_experiment_templates(self.mock_context)
 
         assert len(result) == 2
         assert result[0]['id'] == 'template-1'
@@ -288,7 +297,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await AwsFisActions.list_experiment_templates(self.mock_context)
+            await list_experiment_templates(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -302,7 +311,7 @@ class TestAwsFisActions:
         )
 
         with pytest.raises(ClientError):
-            await AwsFisActions.get_experiment_template(self.mock_context, id=template_id)
+            await get_experiment_template(self.mock_context, id=template_id)
 
         self.mock_context.error.assert_called_once()
 
@@ -339,7 +348,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await ResourceDiscovery.list_cfn_stacks(self.mock_context)
+        result = await list_cfn_stacks(self.mock_context)
 
         assert 'stacks' in result
         assert len(result['stacks']) == 1
@@ -361,9 +370,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await ResourceDiscovery.get_stack_resources(
-            self.mock_context, stack_name=stack_name
-        )
+        result = await get_stack_resources(self.mock_context, stack_name=stack_name)
 
         assert 'resources' in result
         assert len(result['resources']) == 1
@@ -383,7 +390,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await ResourceDiscovery.list_views(self.mock_context)
+        result = await list_views(self.mock_context)
 
         assert len(result) == 1
         assert result[0]['ViewName'] == 'test-view'
@@ -405,7 +412,7 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            result = await ResourceDiscovery.create_view(
+            result = await create_view(
                 self.mock_context,
                 query,
                 view_name,
@@ -418,93 +425,6 @@ class TestResourceDiscovery:
         self.mock_resource_explorer.create_view.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_discover_resources_resource_explorer_only(self):
-        """Test discovering resources from Resource Explorer only."""
-        query = 'service:ec2'
-        self.mock_resource_explorer.search.return_value = {
-            'Resources': [
-                {
-                    'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345',
-                    'Region': 'us-east-1',
-                    'ResourceType': 'AWS::EC2::Instance',
-                    'Service': 'ec2',
-                }
-            ]
-        }
-
-        result = await ResourceDiscovery.discover_resources(
-            self.mock_context, source='resource-explorer', query=query
-        )
-
-        assert 'resources' in result
-        assert len(result['resources']) == 1
-        assert result['resources'][0]['source'] == 'resource-explorer'
-        assert result['resources'][0]['service'] == 'ec2'
-
-    @pytest.mark.asyncio
-    async def test_discover_resources_cloudformation_missing_stack_name(self):
-        """Test error when CloudFormation source is specified without stack name."""
-        with pytest.raises(ValueError, match='stack_name is required'):
-            await ResourceDiscovery.discover_resources(
-                self.mock_context,
-                source='cloudformation',
-                stack_name=None,
-            )
-
-    @pytest.mark.asyncio
-    async def test_discover_resources_resource_explorer_error(self):
-        """Test discover_resources with Resource Explorer error handling."""
-        # Mock Resource Explorer search to fail
-        self.mock_resource_explorer.search.side_effect = Exception('Access denied')
-
-        result = await ResourceDiscovery.discover_resources(
-            self.mock_context, source='resource-explorer'
-        )
-
-        # Should return empty resources list
-        assert 'resources' in result
-        assert len(result['resources']) == 0
-        # Should have called warning for the error
-        self.mock_context.warning.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_discover_resources_cloudformation_with_stack_name(self):
-        """Test discover_resources with cloudformation source and stack name."""
-        stack_name = 'test-stack'
-
-        # Mock get_stack_resources to return some resources
-        mock_resources = {
-            'resources': [
-                {
-                    'ResourceType': 'AWS::EC2::Instance',
-                    'LogicalResourceId': 'MyInstance',
-                    'PhysicalResourceId': 'i-12345',
-                    'ResourceStatus': 'CREATE_COMPLETE',
-                }
-            ]
-        }
-
-        # Mock the static method using patch
-        with patch.object(
-            ResourceDiscovery, 'get_stack_resources', new_callable=AsyncMock
-        ) as mock_get_stack:
-            mock_get_stack.return_value = mock_resources
-
-            result = await ResourceDiscovery.discover_resources(
-                self.mock_context,
-                'cloudformation',
-                stack_name,
-                None,
-                100,
-            )
-
-            # Should have resources from the stack
-            assert 'resources' in result
-            assert len(result['resources']) == 1
-            assert result['resources'][0]['source'] == 'cloudformation'
-            assert result['resources'][0]['stack_name'] == stack_name
-
-    @pytest.mark.asyncio
     async def test_list_cfn_stacks_with_pagination(self):
         """Test listing CloudFormation stacks with pagination."""
         self.mock_cloudformation.list_stacks.side_effect = [
@@ -515,7 +435,7 @@ class TestResourceDiscovery:
             {'StackSummaries': [{'StackName': 'stack-2', 'StackStatus': 'UPDATE_COMPLETE'}]},
         ]
 
-        result = await ResourceDiscovery.list_cfn_stacks(self.mock_context)
+        result = await list_cfn_stacks(self.mock_context)
 
         assert 'stacks' in result
         assert len(result['stacks']) == 2
@@ -532,7 +452,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await ResourceDiscovery.list_cfn_stacks(self.mock_context)
+            await list_cfn_stacks(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -562,9 +482,7 @@ class TestResourceDiscovery:
             },
         ]
 
-        result = await ResourceDiscovery.get_stack_resources(
-            self.mock_context, stack_name=stack_name
-        )
+        result = await get_stack_resources(self.mock_context, stack_name=stack_name)
 
         assert 'resources' in result
         assert len(result['resources']) == 2
@@ -582,7 +500,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await ResourceDiscovery.get_stack_resources(self.mock_context, stack_name=stack_name)
+            await get_stack_resources(self.mock_context, stack_name=stack_name)
 
         self.mock_context.error.assert_called_once()
 
@@ -597,7 +515,7 @@ class TestResourceDiscovery:
             {'Views': [{'ViewName': 'view-2', 'Filters': {'FilterString': 'service:s3'}}]},
         ]
 
-        result = await ResourceDiscovery.list_views(self.mock_context)
+        result = await list_views(self.mock_context)
 
         assert len(result) == 2
         assert result[0]['ViewName'] == 'view-1'
@@ -613,7 +531,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await ResourceDiscovery.list_views(self.mock_context)
+            await list_views(self.mock_context)
 
         self.mock_context.error.assert_called_once()
 
@@ -631,9 +549,7 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            result = await ResourceDiscovery.create_view(
-                self.mock_context, query, view_name, 'Test View', None
-            )
+            result = await create_view(self.mock_context, query, view_name, 'Test View', None)
 
         assert 'View' in result
         assert result['View']['ViewName'] == view_name
@@ -653,7 +569,7 @@ class TestResourceDiscovery:
         }
 
         with patch('time.time', return_value=1234567890):
-            await ResourceDiscovery.create_view(
+            await create_view(
                 self.mock_context,
                 query,
                 view_name,
@@ -677,7 +593,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await ResourceDiscovery.create_view(
+            await create_view(
                 self.mock_context,
                 'service:ec2',
                 'invalid-view',
@@ -686,90 +602,6 @@ class TestResourceDiscovery:
             )
 
         self.mock_context.error.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_discover_resources_with_pagination(self):
-        """Test discovering resources with pagination from Resource Explorer."""
-        query = 'service:ec2'
-        self.mock_resource_explorer.search.side_effect = [
-            {
-                'Resources': [
-                    {
-                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345',
-                        'Service': 'ec2',
-                        'ResourceType': 'AWS::EC2::Instance',
-                    }
-                ],
-                'NextToken': 'token1',
-            },
-            {
-                'Resources': [
-                    {
-                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-67890',
-                        'Service': 'ec2',
-                        'ResourceType': 'AWS::EC2::Instance',
-                    }
-                ]
-            },
-        ]
-
-        result = await ResourceDiscovery.discover_resources(
-            self.mock_context,
-            source='resource-explorer',
-            query=query,
-            max_results=10,
-        )
-
-        assert 'resources' in result
-        assert len(result['resources']) == 2
-        assert (
-            result['resources'][0]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-12345'
-        )
-        assert (
-            result['resources'][1]['arn'] == 'arn:aws:ec2:us-east-1:123456789012:instance/i-67890'
-        )
-
-    @pytest.mark.asyncio
-    async def test_discover_resources_max_results_with_pagination(self):
-        """Test resource discovery hitting max_results limit during pagination."""
-        query = 'service:ec2'
-
-        # Mock paginated response - first call returns 1 resource with NextToken, second call returns 2 more
-        self.mock_resource_explorer.search.side_effect = [
-            {
-                'Resources': [
-                    {
-                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-1',
-                        'ResourceType': 'ec2:instance',
-                    }
-                ],
-                'NextToken': 'token1',
-            },
-            {
-                'Resources': [
-                    {
-                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-2',
-                        'ResourceType': 'ec2:instance',
-                    },
-                    {
-                        'Arn': 'arn:aws:ec2:us-east-1:123456789012:instance/i-3',
-                        'ResourceType': 'ec2:instance',
-                    },
-                ]
-            },
-        ]
-
-        result = await ResourceDiscovery.discover_resources(
-            self.mock_context,
-            source='resource-explorer',
-            query=query,
-            max_results=2,
-        )
-
-        assert 'resources' in result
-        assert (
-            len(result['resources']) == 2
-        )  # Should break when hitting max_results during pagination
 
     @pytest.mark.asyncio
     async def test_discover_relationships_success(self):
@@ -802,7 +634,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await ResourceDiscovery.discover_relationships(
+        result = await discover_relationships(
             self.mock_context, resource_type=resource_type, resource_id=resource_id
         )
 
@@ -832,7 +664,7 @@ class TestResourceDiscovery:
             'configurationItems': []
         }
 
-        result = await ResourceDiscovery.discover_relationships(
+        result = await discover_relationships(
             self.mock_context, resource_type=resource_type, resource_id=resource_id
         )
 
@@ -865,7 +697,7 @@ class TestResourceDiscovery:
             ]
         }
 
-        result = await ResourceDiscovery.discover_relationships(
+        result = await discover_relationships(
             self.mock_context,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -897,7 +729,7 @@ class TestResourceDiscovery:
         )
 
         with pytest.raises(ClientError):
-            await ResourceDiscovery.discover_relationships(
+            await discover_relationships(
                 self.mock_context, resource_type=resource_type, resource_id=resource_id
             )
 
@@ -935,7 +767,7 @@ class TestExperimentTemplates:
         description = 'Test Template'
         role_arn = 'arn:aws:iam::123456789012:role/FisRole'
 
-        result = await ExperimentTemplates.create_experiment_template(
+        result = await create_experiment_template(
             self.mock_context,
             client_token,
             description,
@@ -956,7 +788,7 @@ class TestExperimentTemplates:
             'experimentTemplate': {'id': template_id, 'description': 'Test Template'}
         }
 
-        result = await ExperimentTemplates.create_experiment_template(
+        result = await create_experiment_template(
             self.mock_context,
             'test-token',
             'Test Template',
@@ -983,7 +815,7 @@ class TestExperimentTemplates:
         )
 
         with pytest.raises(ClientError):
-            await ExperimentTemplates.create_experiment_template(
+            await create_experiment_template(
                 self.mock_context,
                 'test-token',
                 'Test Template',
@@ -1002,7 +834,7 @@ class TestExperimentTemplates:
             'experimentTemplate': {'id': template_id, 'description': 'Updated Template'}
         }
 
-        result = await ExperimentTemplates.update_experiment_template(
+        result = await update_experiment_template(
             self.mock_context,
             id=template_id,
             description='Updated Template',
@@ -1021,7 +853,7 @@ class TestExperimentTemplates:
             'experimentTemplate': {'id': template_id}
         }
 
-        result = await ExperimentTemplates.update_experiment_template(
+        result = await update_experiment_template(
             self.mock_context,
             id=template_id,
             description='Updated Description',
@@ -1047,7 +879,7 @@ class TestExperimentTemplates:
         )
 
         with pytest.raises(ClientError):
-            await ExperimentTemplates.update_experiment_template(
+            await update_experiment_template(
                 self.mock_context,
                 id=template_id,
                 description='Updated Template',

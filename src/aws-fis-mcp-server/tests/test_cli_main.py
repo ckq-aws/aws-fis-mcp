@@ -14,11 +14,11 @@
 
 """Tests for CLI argument parsing and main function."""
 
+import awslabs.aws_fis_mcp_server.server as server_module
 import pytest
 import sys
-import awslabs.aws_fis_mcp_server.server as server_module
 from awslabs.aws_fis_mcp_server.server import main
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 class TestCliMain:
@@ -34,16 +34,16 @@ class TestCliMain:
 
         # Verify AWS clients were initialized with defaults
         mock_initialize.assert_called_once_with('us-east-1', None)
-        
+
         # Verify logging calls
         mock_logger.info.assert_any_call(
             'AWS FIS MCP Server starting with AWS_PROFILE: %s, AWS_REGION: %s, ALLOW_WRITES: %s',
             'default',
             'us-east-1',
-            False
+            False,
         )
         mock_logger.info.assert_any_call('Starting AWS FIS MCP Server')
-        
+
         # Verify MCP server was started
         mock_mcp_run.assert_called_once()
 
@@ -54,27 +54,29 @@ class TestCliMain:
         """Test main function with all CLI arguments provided."""
         test_args = [
             'aws-fis-mcp-server',
-            '--aws-profile', 'test-profile',
-            '--aws-region', 'eu-west-1',
-            '--allow-writes'
+            '--aws-profile',
+            'test-profile',
+            '--aws-region',
+            'eu-west-1',
+            '--allow-writes',
         ]
-        
+
         with patch.object(sys, 'argv', test_args):
             main()
 
         # Verify AWS clients were initialized with provided arguments
         mock_initialize.assert_called_once_with('eu-west-1', 'test-profile')
-        
+
         # Verify logging calls with correct values
         mock_logger.info.assert_any_call(
             'AWS FIS MCP Server starting with AWS_PROFILE: %s, AWS_REGION: %s, ALLOW_WRITES: %s',
             'test-profile',
             'eu-west-1',
-            True
+            True,
         )
-        
+
         # Verify global variables were set correctly
-        assert server_module.allow_writes == True
+        assert server_module.allow_writes
         assert server_module.aws_profile_override == 'test-profile'
         assert server_module.aws_region_override == 'eu-west-1'
 
@@ -97,7 +99,7 @@ class TestCliMain:
     def test_main_cli_overrides_environment(self, mock_logger, mock_initialize, mock_mcp_run):
         """Test CLI argument overrides environment variable."""
         test_args = ['aws-fis-mcp-server', '--aws-region', 'ap-southeast-1']
-        
+
         with patch.object(sys, 'argv', test_args):
             main()
 
@@ -110,19 +112,19 @@ class TestCliMain:
     def test_main_profile_only(self, mock_logger, mock_initialize, mock_mcp_run):
         """Test main function with only profile argument."""
         test_args = ['aws-fis-mcp-server', '--aws-profile', 'production']
-        
+
         with patch.object(sys, 'argv', test_args):
             main()
 
         # Should use profile with default region
         mock_initialize.assert_called_once_with('us-east-1', 'production')
-        
+
         # Verify logging
         mock_logger.info.assert_any_call(
             'AWS FIS MCP Server starting with AWS_PROFILE: %s, AWS_REGION: %s, ALLOW_WRITES: %s',
             'production',
             'us-east-1',
-            False
+            False,
         )
 
     @patch('awslabs.aws_fis_mcp_server.server.mcp.run')
@@ -131,7 +133,7 @@ class TestCliMain:
     def test_main_region_only(self, mock_logger, mock_initialize, mock_mcp_run):
         """Test main function with only region argument."""
         test_args = ['aws-fis-mcp-server', '--aws-region', 'ca-central-1']
-        
+
         with patch.object(sys, 'argv', test_args):
             main()
 
@@ -144,31 +146,31 @@ class TestCliMain:
     def test_main_allow_writes_only(self, mock_logger, mock_initialize, mock_mcp_run):
         """Test main function with only allow-writes flag."""
         test_args = ['aws-fis-mcp-server', '--allow-writes']
-        
+
         with patch.object(sys, 'argv', test_args):
             main()
 
         # Should enable writes with defaults for other settings
         mock_initialize.assert_called_once_with('us-east-1', None)
-        
+
         # Verify allow_writes was set to True
-        assert server_module.allow_writes == True
-        
+        assert server_module.allow_writes
+
         mock_logger.info.assert_any_call(
             'AWS FIS MCP Server starting with AWS_PROFILE: %s, AWS_REGION: %s, ALLOW_WRITES: %s',
             'default',
             'us-east-1',
-            True
+            True,
         )
 
     @patch('awslabs.aws_fis_mcp_server.server.mcp.run')
     @patch('awslabs.aws_fis_mcp_server.server.initialize_aws_clients')
     def test_main_initialization_error_propagates(self, mock_initialize, mock_mcp_run):
         """Test that initialization errors are propagated."""
-        mock_initialize.side_effect = Exception("AWS initialization failed")
-        
+        mock_initialize.side_effect = Exception('AWS initialization failed')
+
         with patch.object(sys, 'argv', ['aws-fis-mcp-server']):
-            with pytest.raises(Exception, match="AWS initialization failed"):
+            with pytest.raises(Exception, match='AWS initialization failed'):
                 main()
 
         # MCP server should not start if initialization fails
@@ -177,21 +179,21 @@ class TestCliMain:
     def test_main_argument_parser_help(self):
         """Test that argument parser help works correctly."""
         test_args = ['aws-fis-mcp-server', '--help']
-        
+
         with patch.object(sys, 'argv', test_args):
             with pytest.raises(SystemExit) as exc_info:
                 main()
-            
+
             # Help should exit with code 0
             assert exc_info.value.code == 0
 
     def test_main_invalid_argument(self):
         """Test handling of invalid arguments."""
         test_args = ['aws-fis-mcp-server', '--invalid-argument']
-        
+
         with patch.object(sys, 'argv', test_args):
             with pytest.raises(SystemExit) as exc_info:
                 main()
-            
+
             # Invalid argument should exit with non-zero code
             assert exc_info.value.code != 0
