@@ -141,12 +141,12 @@ The MCP Inspector is a powerful tool for debugging and troubleshooting your MCP 
 ```
 cd src/aws-fis-mcp-server
 ```
-3.Run MCP Inspector:
+3. Run MCP Inspector:
 - **Command to Start MCP Inspector**:
 ```
 mcp dev server.py
 ```
-3. In your terminal copy or click the link to the inspector with the pre-filled token: http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=[PRE-FILLED TOKEN]
+4. In your terminal copy or click the link to the inspector with the pre-filled token: http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=[PRE-FILLED TOKEN]
 5. Happy debugging!
 
 ### Using MCP Inspector
