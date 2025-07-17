@@ -1,4 +1,8 @@
+import time
 from mcp.server.fastmcp import Context
+from pydantic import Field
+from typing import Any, Dict, List, Optional
+
 
 """AWS Resource Discovery Tools.
 
@@ -17,7 +21,6 @@ provisioned.
 """
 
 
-@mcp.tool(name='list_cfn_stacks')
 async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
     """Retrieve all AWS CloudFormation Stacks.
 
@@ -29,6 +32,12 @@ async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
     """
     try:
         all_stacks = []
+        from awslabs.aws_fis_mcp_server.server import cloudformation
+
+        if cloudformation is None:
+            raise Exception(
+                'AWS CloudFormation client not initialized. Please ensure the server is properly configured.'
+            )
         cfn = cloudformation
         response = cfn.list_stacks()
         all_stacks.extend(response.get('StackSummaries', []))
@@ -44,7 +53,6 @@ async def list_cfn_stacks(ctx: Context) -> Dict[str, Any]:
         raise
 
 
-@mcp.tool(name='get_stack_resources')
 async def get_stack_resources(
     ctx: Context,
     stack_name: str = Field(
@@ -65,6 +73,12 @@ async def get_stack_resources(
     """
     try:
         all_resources = []
+        from awslabs.aws_fis_mcp_server.server import cloudformation
+
+        if cloudformation is None:
+            raise Exception(
+                'AWS CloudFormation client not initialized. Please ensure the server is properly configured.'
+            )
         cfn = cloudformation
         response = cfn.list_stack_resources(StackName=stack_name)
         all_resources.extend(response.get('StackResourceSummaries', []))
@@ -82,7 +96,6 @@ async def get_stack_resources(
         raise
 
 
-@mcp.tool(name='list_resource_explorer_views')
 async def list_views(ctx: Context) -> List[Dict[str, Any]]:
     """List Resource Explorer views.
 
@@ -94,6 +107,12 @@ async def list_views(ctx: Context) -> List[Dict[str, Any]]:
     """
     try:
         all_views = []
+        from awslabs.aws_fis_mcp_server.server import resource_explorer
+
+        if resource_explorer is None:
+            raise Exception(
+                'AWS Resource Explorer client not initialized. Please ensure the server is properly configured.'
+            )
         response = resource_explorer.list_views()
         all_views.extend(response.get('Views', []))
 
@@ -108,7 +127,6 @@ async def list_views(ctx: Context) -> List[Dict[str, Any]]:
         raise
 
 
-@mcp.tool(name='search_resources')
 async def search_resources(
     ctx: Context,
     query_string: str = Field(..., description='The query string to search for resources'),
@@ -144,6 +162,12 @@ async def search_resources(
             search_params['NextToken'] = next_token
 
         # Execute search
+        from awslabs.aws_fis_mcp_server.server import resource_explorer
+
+        if resource_explorer is None:
+            raise Exception(
+                'AWS Resource Explorer client not initialized. Please ensure the server is properly configured.'
+            )
         response = resource_explorer.search(**search_params)
 
         # Format results
@@ -165,7 +189,6 @@ async def search_resources(
         raise
 
 
-@mcp.tool(name='create_resource_explorer_view')
 async def create_view(
     ctx: Context,
     query: str = Field(..., description='Filter string for the view'),
@@ -198,6 +221,12 @@ async def create_view(
         Exception: For AWS API errors or when writes are disabled
     """
     global allow_writes
+    from awslabs.aws_fis_mcp_server.server import allow_writes, resource_explorer
+
+    if resource_explorer is None:
+        raise Exception(
+            'AWS Resource Explorer client not initialized. Please ensure the server is properly configured.'
+        )
 
     # Check if writes are allowed
     if not allow_writes:
@@ -232,7 +261,6 @@ async def create_view(
         raise
 
 
-@mcp.tool(name='discover_resource_relationships')
 async def discover_relationships(
     ctx: Context,
     resource_type: str = Field(
@@ -275,6 +303,12 @@ async def discover_relationships(
         if limit:
             params['limit'] = limit
 
+        from awslabs.aws_fis_mcp_server.server import aws_config_client
+
+        if aws_config_client is None:
+            raise Exception(
+                'AWS Config client not initialized. Please ensure the server is properly configured.'
+            )
         response = aws_config_client.get_resource_config_history(**params)
 
         result = {

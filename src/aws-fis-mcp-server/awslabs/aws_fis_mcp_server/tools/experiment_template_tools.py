@@ -1,4 +1,7 @@
 from mcp.server.fastmcp import Context
+from pydantic import Field
+from typing import Any, Dict, List, Optional
+
 
 """AWS FIS Experiment Template Management Tools.
 
@@ -13,7 +16,6 @@ responses suitable for consumption by LLMs.
 Experiment templates created through these tools can later be used to run
 actual fault injection experiments using the FIS experiment management tools.
 """
-
 
 
 async def create_experiment_template(
@@ -73,6 +75,12 @@ async def create_experiment_template(
         Exception: For AWS API errors or when writes are disabled
     """
     global allow_writes
+    from awslabs.aws_fis_mcp_server.server import allow_writes, aws_fis
+
+    if aws_fis is None:
+        raise Exception(
+            'AWS FIS client not initialized. Please ensure the server is properly configured.'
+        )
 
     # Check if writes are allowed
     if not allow_writes:
@@ -115,7 +123,6 @@ async def create_experiment_template(
     except Exception as e:
         await ctx.error(f'Error creating experiment template: {str(e)}')
         raise
-
 
 
 async def update_experiment_template(
@@ -194,6 +201,12 @@ async def update_experiment_template(
         if experiment_report_configuration is not None:
             update_params['experimentReportConfiguration'] = experiment_report_configuration
 
+        from awslabs.aws_fis_mcp_server.server import aws_fis
+
+        if aws_fis is None:
+            raise Exception(
+                'AWS FIS client not initialized. Please ensure the server is properly configured.'
+            )
         response = aws_fis.update_experiment_template(**update_params)
         await ctx.info(f'Successfully updated experiment template: {id}')
         return response

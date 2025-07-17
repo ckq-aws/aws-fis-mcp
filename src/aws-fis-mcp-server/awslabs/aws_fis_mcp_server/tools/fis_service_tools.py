@@ -1,17 +1,7 @@
 from mcp.server.fastmcp import Context
-from awslabs.aws_fis_mcp_server.consts import (
-    AWS_CONFIG_MAX_ATTEMPTS,
-    AWS_CONFIG_RETRY_MODE,
-    AWS_CONFIG_SIGNATURE_VERSION,
-    DEFAULT_AWS_REGION,
-    ENV_AWS_REGION,
-    ENV_FASTMCP_LOG_LEVEL,
-    SERVICE_CLOUDFORMATION,
-    SERVICE_CONFIG,
-    SERVICE_FIS,
-    SERVICE_RESOURCE_EXPLORER,
-    SERVICE_S3,
-)
+from pydantic import Field
+from typing import Any, Dict, List, Optional
+
 
 """AWS FIS Experiment Management Tools.
 
@@ -36,6 +26,12 @@ async def list_all_fis_experiments(ctx: Context) -> Dict[str, Dict[str, Any]]:
     Dict containing experiment details organized by name
     """
     try:
+        from awslabs.aws_fis_mcp_server.server import aws_fis
+
+        if aws_fis is None:
+            raise Exception(
+                'AWS FIS client not initialized. Please ensure the server is properly configured.'
+            )
         response = aws_fis.list_experiments()
         experiments = response.get('experiments', [])
         formatted_results = {}
@@ -88,6 +84,8 @@ async def get_experiment_details(
         Dict containing experiment details
     """
     try:
+        from awslabs.aws_fis_mcp_server.server import aws_fis
+
         response = aws_fis.get_experiment(id=id)
         return response.get('experiment', {})
     except Exception as e:
@@ -107,6 +105,12 @@ async def list_experiment_templates(ctx: Context) -> List[Dict[str, Any]]:
     """
     try:
         all_templates = []
+        from awslabs.aws_fis_mcp_server.server import aws_fis
+
+        if aws_fis is None:
+            raise Exception(
+                'AWS FIS client not initialized. Please ensure the server is properly configured.'
+            )
         response = aws_fis.list_experiment_templates()
         all_templates.extend(response.get('experimentTemplates', []))
 
@@ -139,6 +143,12 @@ async def get_experiment_template(
         Dict containing experiment template details
     """
     try:
+        from awslabs.aws_fis_mcp_server.server import aws_fis
+
+        if aws_fis is None:
+            raise Exception(
+                'AWS FIS client not initialized. Please ensure the server is properly configured.'
+            )
         response = aws_fis.get_experiment_template(id=id)
         return response
     except Exception as e:
@@ -177,6 +187,12 @@ async def start_experiment(
         Exception: For AWS API errors or when writes are disabled
     """
     global allow_writes
+    from awslabs.aws_fis_mcp_server.server import allow_writes, aws_fis
+
+    if aws_fis is None:
+        raise Exception(
+            'AWS FIS client not initialized. Please ensure the server is properly configured.'
+        )
 
     # Check if writes are allowed
     if not allow_writes:

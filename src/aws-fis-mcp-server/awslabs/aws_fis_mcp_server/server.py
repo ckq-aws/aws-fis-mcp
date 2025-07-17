@@ -18,7 +18,6 @@ import argparse
 import boto3
 import os
 import sys
-import time
 from awslabs.aws_fis_mcp_server import __version__
 from awslabs.aws_fis_mcp_server.consts import (
     AWS_CONFIG_MAX_ATTEMPTS,
@@ -33,20 +32,30 @@ from awslabs.aws_fis_mcp_server.consts import (
     SERVICE_RESOURCE_EXPLORER,
     SERVICE_S3,
 )
+from awslabs.aws_fis_mcp_server.tools.experiment_template_tools import (
+    create_experiment_template,
+    update_experiment_template,
+)
+from awslabs.aws_fis_mcp_server.tools.fis_service_tools import (
+    get_experiment_details,
+    get_experiment_template,
+    list_all_fis_experiments,
+    list_experiment_templates,
+    start_experiment,
+)
+from awslabs.aws_fis_mcp_server.tools.resource_discovery_tools import (
+    create_view,
+    discover_relationships,
+    get_stack_resources,
+    list_cfn_stacks,
+    list_views,
+    search_resources,
+)
 from botocore.config import Config
 from dotenv import load_dotenv
 from loguru import logger
 from mcp.server.fastmcp import FastMCP
-from pydantic import Field
-from typing import Any, Dict, List, Optional
-
-from awslabs.aws_fis_mcp_server.tools.fis_service_tools import (
-    list_all_fis_experiments,
-    get_experiment_details,
-    list_experiment_templates,
-    get_experiment_template,
-    start_experiment
-)
+from typing import Any, Optional
 
 
 # Configure logging
@@ -70,6 +79,44 @@ aws_config_client: Any = None
 
 # Get region from environment or default to us-east-1
 AWS_REGION = os.getenv(ENV_AWS_REGION, DEFAULT_AWS_REGION)
+
+
+# Initialize AWS clients at module level with default configuration
+def init_default_clients():
+    """Initialize AWS clients with default configuration."""
+    global aws_fis, s3, resource_explorer, cloudformation, aws_config_client
+
+    try:
+        # Use default region from environment
+        region = os.getenv(ENV_AWS_REGION, DEFAULT_AWS_REGION)
+
+        # Create AWS session
+        session = boto3.Session(region_name=region)
+
+        # Create AWS config
+        aws_config = Config(
+            region_name=region,
+            signature_version=AWS_CONFIG_SIGNATURE_VERSION,
+            retries={'max_attempts': AWS_CONFIG_MAX_ATTEMPTS, 'mode': AWS_CONFIG_RETRY_MODE},
+            user_agent_extra=f'awslabs/mcp/aws-fis-mcp-server/{__version__}',
+        )
+
+        # Initialize AWS clients
+        aws_fis = session.client(SERVICE_FIS, config=aws_config)
+        s3 = session.client(SERVICE_S3, config=aws_config)
+        resource_explorer = session.client(SERVICE_RESOURCE_EXPLORER, config=aws_config)
+        cloudformation = session.client(SERVICE_CLOUDFORMATION, config=aws_config)
+        aws_config_client = session.client(SERVICE_CONFIG, config=aws_config)
+
+        logger.info(f'AWS clients initialized with default configuration in region {region}')
+
+    except Exception as e:
+        logger.error(f'Error initializing default AWS clients: {str(e)}')
+        # Don't raise here, let the tools handle the error gracefully
+
+
+# Initialize clients at module load time
+init_default_clients()
 
 
 def initialize_aws_clients(region: str, profile: Optional[str] = None):
@@ -106,67 +153,68 @@ def initialize_aws_clients(region: str, profile: Optional[str] = None):
         raise
 
 
-# Initialize MCP server
 mcp = FastMCP(
-    name='awslabs.aws-fis-mcp-server',
-    instructions="""An MCP Server that enables LLMs to plan, create, and execute AWS Fault Injection Simulator (FIS) experiments.
+    'awslabs.aws-fis-mcp-server',
+    instructions="""
+# AWS FIS MCP Server
 
-    This server provides tools for:
-    - Listing and managing FIS experiments
-    - Creating and executing experiment templates
-    - Exploring AWS resources for fault injection
-    - Working with CloudFormation stacks
+This MCP server provides tools for creating, managing, and executing AWS Fault Injection Simulator (FIS) experiments. It enables AI assistants to help users design resilient systems through controlled fault injection.
 
-    Use these tools to help users design resilient systems through controlled fault injection.
+## Available Tools
 
-    When invoking methods in the classes do not use the self argument as it is not meant to take arguments but rather refers to the class itself.
-    """,
+### FIS Experiment Management
+- **ListFISExperiments**: List all FIS experiments
+- **GetFISExperiment**: Get details about a specific experiment
+- **StartFISExperiment**: Start a FIS experiment from a template
+- **ListFISExperimentTemplates**: List available experiment templates
+- **GetFISExperimentTemplate**: Get details about a specific experiment template
+
+### Experiment Template Management
+- **CreateFISExperimentTemplate**: Create a new experiment template
+- **UpdateFISExperimentTemplate**: Update an existing experiment template
+
+### Resource Discovery
+- **ListCloudFormationStacks**: List CloudFormation stacks
+- **GetStackResources**: Get resources from a specific stack
+- **ListResourceExplorerViews**: List Resource Explorer views
+- **SearchResources**: Search for resources using Resource Explorer
+- **CreateResourceExplorerView**: Create a new Resource Explorer view
+- **DiscoverResourceRelationships**: Discover relationships between resources
+
+## Service Availability
+AWS FIS is available in select AWS regions. The server will use the configured region for all operations.
+""",
+    dependencies=[
+        'boto3',
+        'botocore',
+        'pydantic',
+        'loguru',
+        'python-dotenv',
+    ],
 )
 
+# Register FIS service tools
+mcp.tool(name='ListFISExperiments')(list_all_fis_experiments)
+mcp.tool(name='GetFISExperiment')(get_experiment_details)
+mcp.tool(name='ListFISExperimentTemplates')(list_experiment_templates)
+mcp.tool(name='GetFISExperimentTemplate')(get_experiment_template)
+mcp.tool(name='StartFISExperiment')(start_experiment)
 
-# FIS Service Tools
-mcp.tool(name='list_fis_experiments')(list_all_fis_experiments)
-mcp.tool(name='get_experiment')(get_experiment_details)
-mcp.tool(name='list_experiment_templates')(list_experiment_templates)
-mcp.tool(name='get_experiment_template')(get_experiment_template)
-mcp.tool(name='start_experiment')(start_experiment)
+# Register experiment template tools
+mcp.tool(name='CreateFISExperimentTemplate')(create_experiment_template)
+mcp.tool(name='UpdateFISExperimentTemplate')(update_experiment_template)
 
-# Resource Discovery Tools
-mcp.tool(name='list_cfn_stacks')
-mcp.tool(name='get_stack_resources')
-mcp.tool(name='list_resource_explorer_views')
-mcp.tool(name='search_resources')
-mcp.tool(name='create_resource_explorer_view')
-mcp.tool(name='discover_resource_relationships')
-
-# FIS Experiment Management Tools
-mcp.tool(name='create_experiment_template')
-mcp.tool(name='update_experiment_template')
-
+# Register resource discovery tools
+mcp.tool(name='ListCloudFormationStacks')(list_cfn_stacks)
+mcp.tool(name='GetStackResources')(get_stack_resources)
+mcp.tool(name='ListResourceExplorerViews')(list_views)
+mcp.tool(name='SearchResources')(search_resources)
+mcp.tool(name='CreateResourceExplorerView')(create_view)
+mcp.tool(name='DiscoverResourceRelationships')(discover_relationships)
 
 
 def main():
-    """Run the AWS FIS MCP Server with CLI argument support.
-
-    This function initializes and starts the AWS FIS MCP Server, which provides
-    a set of tools for interacting with AWS Fault Injection Simulator (FIS) and
-    related services through the Model Context Protocol (MCP).
-
-    CLI Arguments:
-        --aws-profile: AWS profile to use for credentials
-        --aws-region: AWS region to use (overrides environment variables)
-        --allow-writes: Allow destructive operations like starting experiments
-
-    The server is configured with the FastMCP framework and exposes a collection
-    of tools organized into classes for different functional areas:
-    - AwsFisActions: For managing FIS experiments and templates
-    - ExperimentTemplates: For creating and managing experiment templates
-    - ResourceDiscovery: Consolidated class for discovering AWS resources from
-      CloudFormation and Resource Explorer
-
-    When executed, the server starts listening for MCP requests and responds
-    with the results of the requested operations.
-    """
+    """Run the MCP server with CLI argument support."""
     global allow_writes, aws_profile_override, aws_region_override
 
     # Parse command line arguments
@@ -202,11 +250,12 @@ def main():
         allow_writes,
     )
 
-    # Initialize AWS clients with the determined configuration
-    initialize_aws_clients(effective_region, aws_profile_override)
+    # Re-initialize AWS clients if custom parameters are provided
+    if aws_profile_override or aws_region_override:
+        initialize_aws_clients(effective_region, aws_profile_override)
 
     # Start the MCP server
-    logger.info('Starting AWS FIS MCP Server')
+    logger.info('AWS FIS MCP server starting')
     mcp.run()
 
 

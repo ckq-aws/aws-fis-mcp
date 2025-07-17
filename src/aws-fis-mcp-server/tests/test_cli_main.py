@@ -32,8 +32,9 @@ class TestCliMain:
         with patch.object(sys, 'argv', ['aws-fis-mcp-server']):
             main()
 
-        # Verify AWS clients were initialized with defaults
-        mock_initialize.assert_called_once_with('us-east-1', None)
+        # With default arguments, initialize_aws_clients should not be called
+        # because clients are initialized at module level
+        mock_initialize.assert_not_called()
 
         # Verify logging calls
         mock_logger.info.assert_any_call(
@@ -42,7 +43,7 @@ class TestCliMain:
             'us-east-1',
             False,
         )
-        mock_logger.info.assert_any_call('Starting AWS FIS MCP Server')
+        mock_logger.info.assert_any_call('AWS FIS MCP server starting')
 
         # Verify MCP server was started
         mock_mcp_run.assert_called_once()
@@ -89,8 +90,9 @@ class TestCliMain:
         with patch.object(sys, 'argv', ['aws-fis-mcp-server']):
             main()
 
-        # Should use environment variable over default
-        mock_initialize.assert_called_once_with('us-west-2', None)
+        # With only environment variable set, initialize_aws_clients should not be called
+        # because no custom CLI parameters were provided
+        mock_initialize.assert_not_called()
 
     @patch('awslabs.aws_fis_mcp_server.server.mcp.run')
     @patch('awslabs.aws_fis_mcp_server.server.initialize_aws_clients')
@@ -103,7 +105,7 @@ class TestCliMain:
         with patch.object(sys, 'argv', test_args):
             main()
 
-        # CLI argument should override environment variable
+        # CLI argument provided, so initialize_aws_clients should be called
         mock_initialize.assert_called_once_with('ap-southeast-1', None)
 
     @patch('awslabs.aws_fis_mcp_server.server.mcp.run')
@@ -150,8 +152,9 @@ class TestCliMain:
         with patch.object(sys, 'argv', test_args):
             main()
 
-        # Should enable writes with defaults for other settings
-        mock_initialize.assert_called_once_with('us-east-1', None)
+        # With only --allow-writes flag, initialize_aws_clients should not be called
+        # because no custom region or profile parameters were provided
+        mock_initialize.assert_not_called()
 
         # Verify allow_writes was set to True
         assert server_module.allow_writes
@@ -166,13 +169,16 @@ class TestCliMain:
     @patch('awslabs.aws_fis_mcp_server.server.mcp.run')
     @patch('awslabs.aws_fis_mcp_server.server.initialize_aws_clients')
     def test_main_initialization_error_propagates(self, mock_initialize, mock_mcp_run):
-        """Test that initialization errors are propagated."""
+        """Test that initialization errors are propagated when custom parameters are provided."""
         mock_initialize.side_effect = Exception('AWS initialization failed')
 
-        with patch.object(sys, 'argv', ['aws-fis-mcp-server']):
+        # Use custom region to trigger initialize_aws_clients call
+        with patch.object(sys, 'argv', ['aws-fis-mcp-server', '--aws-region', 'us-west-1']):
             with pytest.raises(Exception, match='AWS initialization failed'):
                 main()
 
+        # initialize_aws_clients should have been called due to custom region
+        mock_initialize.assert_called_once_with('us-west-1', None)
         # MCP server should not start if initialization fails
         mock_mcp_run.assert_not_called()
 
